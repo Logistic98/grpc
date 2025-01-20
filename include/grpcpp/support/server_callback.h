@@ -1,28 +1,25 @@
-/*
- *
- * Copyright 2018 gRPC authors.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- *
- */
+//
+//
+// Copyright 2018 gRPC authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+//
 
 #ifndef GRPCPP_SUPPORT_SERVER_CALLBACK_H
 #define GRPCPP_SUPPORT_SERVER_CALLBACK_H
 
-#include <atomic>
-#include <functional>
-#include <type_traits>
-
+#include <grpc/impl/call.h>
 #include <grpcpp/impl/call.h>
 #include <grpcpp/impl/call_op_set.h>
 #include <grpcpp/impl/sync.h>
@@ -30,6 +27,12 @@
 #include <grpcpp/support/config.h>
 #include <grpcpp/support/message_allocator.h>
 #include <grpcpp/support/status.h>
+
+#include <atomic>
+#include <functional>
+#include <type_traits>
+
+#include "absl/functional/any_invocable.h"
 
 namespace grpc {
 
@@ -126,6 +129,12 @@ class ServerCallbackCall {
 
  private:
   virtual ServerReactor* reactor() = 0;
+
+  virtual grpc_call* call() = 0;
+
+  virtual void RunAsync(absl::AnyInvocable<void()> cb) {
+    grpc_call_run_in_event_engine(call(), std::move(cb));
+  }
 
   // CallOnDone performs the work required at completion of the RPC: invoking
   // the OnDone function and doing all necessary cleanup. This function is only
@@ -468,10 +477,10 @@ class ServerBidiReactor : public internal::ServerReactor {
   }
 
   grpc::internal::Mutex stream_mu_;
-  // TODO(vjpai): Make stream_or_backlog_ into a std::variant or absl::variant
-  //              once C++17 or ABSL is supported since stream and backlog are
-  //              mutually exclusive in this class. Do likewise with the
-  //              remaining reactor classes and their backlogs as well.
+  // TODO(vjpai): Make stream_or_backlog_ into an std::variant once C++17 or
+  // ABSL is supported since stream and backlog are mutually exclusive in this
+  // class. Do likewise with the  remaining reactor classes and their backlogs
+  // as well.
   std::atomic<ServerCallbackReaderWriter<Request, Response>*> stream_{nullptr};
   struct PreBindBacklog {
     bool send_initial_metadata_wanted = false;

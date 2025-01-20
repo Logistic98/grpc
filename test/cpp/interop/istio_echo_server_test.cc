@@ -14,22 +14,21 @@
 // limitations under the License.
 //
 
-#include <memory>
-
 #include <gmock/gmock.h>
-#include <gtest/gtest.h>
-
-#include "absl/strings/str_cat.h"
-#include "absl/strings/str_format.h"
-
 #include <grpcpp/create_channel.h>
 #include <grpcpp/security/credentials.h>
 #include <grpcpp/server_builder.h>
 #include <grpcpp/support/status.h>
+#include <gtest/gtest.h>
 
-#include "src/core/lib/gprpp/host_port.h"
-#include "test/core/util/port.h"
-#include "test/core/util/test_config.h"
+#include <memory>
+
+#include "absl/strings/str_cat.h"
+#include "absl/strings/str_format.h"
+#include "src/core/util/crash.h"
+#include "src/core/util/host_port.h"
+#include "test/core/test_util/port.h"
+#include "test/core/test_util/test_config.h"
 #include "test/cpp/interop/istio_echo_server_lib.h"
 
 namespace grpc {
@@ -51,7 +50,7 @@ class SimpleEchoTestServerImpl : public proto::EchoTestService::Service {
   grpc::Status Echo(grpc::ServerContext* /* context */,
                     const proto::EchoRequest* /* request */,
                     proto::EchoResponse* /* response */) override {
-    GPR_ASSERT(false);
+    grpc_core::Crash("unreachable");
     return Status(StatusCode::INVALID_ARGUMENT, "Unexpected");
   }
 

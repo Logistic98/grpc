@@ -16,14 +16,13 @@
 //
 //
 
-#include <grpc/support/port_platform.h>
-
 #include "src/core/lib/security/certificate_provider/certificate_provider_registry.h"
 
 #include <gmock/gmock.h>
+#include <grpc/support/port_platform.h>
 
 #include "src/core/lib/security/credentials/tls/grpc_tls_certificate_provider.h"
-#include "test/core/util/test_config.h"
+#include "test/core/test_util/test_config.h"
 
 namespace grpc_core {
 namespace testing {
@@ -31,10 +30,11 @@ namespace {
 
 class FakeCertificateProviderFactory1 : public CertificateProviderFactory {
  public:
-  const char* name() const override { return "fake1"; }
+  absl::string_view name() const override { return "fake1"; }
 
   RefCountedPtr<Config> CreateCertificateProviderConfig(
-      const Json& /*config_json*/, grpc_error_handle* /*error*/) override {
+      const Json& /*config_json*/, const JsonArgs& /*args*/,
+      ValidationErrors* /*errors*/) override {
     return nullptr;
   }
 
@@ -46,10 +46,11 @@ class FakeCertificateProviderFactory1 : public CertificateProviderFactory {
 
 class FakeCertificateProviderFactory2 : public CertificateProviderFactory {
  public:
-  const char* name() const override { return "fake2"; }
+  absl::string_view name() const override { return "fake2"; }
 
   RefCountedPtr<Config> CreateCertificateProviderConfig(
-      const Json& /*config_json*/, grpc_error_handle* /*error*/) override {
+      const Json& /*config_json*/, const JsonArgs& /*args*/,
+      ValidationErrors* /*errors*/) override {
     return nullptr;
   }
 

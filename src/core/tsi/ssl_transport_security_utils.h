@@ -1,32 +1,32 @@
-/*
- *
- * Copyright 2022 gRPC authors.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- *
- */
+//
+//
+// Copyright 2022 gRPC authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+//
 
-#ifndef GRPC_CORE_TSI_SSL_TRANSPORT_SECURITY_UTILS_H
-#define GRPC_CORE_TSI_SSL_TRANSPORT_SECURITY_UTILS_H
-
-#include <grpc/support/port_platform.h>
-
-#include <openssl/x509.h>
-
-#include "absl/strings/string_view.h"
+#ifndef GRPC_SRC_CORE_TSI_SSL_TRANSPORT_SECURITY_UTILS_H
+#define GRPC_SRC_CORE_TSI_SSL_TRANSPORT_SECURITY_UTILS_H
 
 #include <grpc/grpc_security_constants.h>
+#include <grpc/support/port_platform.h>
+#include <openssl/evp.h>
+#include <openssl/x509.h>
 
+#include "absl/status/status.h"
+#include "absl/status/statusor.h"
+#include "absl/strings/string_view.h"
 #include "src/core/tsi/ssl/key_logging/ssl_key_logging.h"
 #include "src/core/tsi/transport_security_interface.h"
 
@@ -97,7 +97,7 @@ tsi_result SslProtectorProtect(const unsigned char* unprotected_bytes,
                                size_t* protected_output_frames_size);
 
 // Builds a TLS frame out of the remaining plaintext bytes that's left in
-// buffer. Populates the size of the remianing TLS frame to
+// buffer. Populates the size of the remaining TLS frame to
 // |still_pending_size|.
 //
 // buffer_size: the size of |buffer|. If |buffer_offset| equals |buffer_size|,
@@ -142,6 +142,41 @@ tsi_result SslProtectorUnprotect(const unsigned char* protected_frames_bytes,
                                  unsigned char* unprotected_bytes,
                                  size_t* unprotected_bytes_size);
 
+// Verifies that `crl` was signed by `issuer.
+// return: true if valid, false otherwise.
+bool VerifyCrlSignature(X509_CRL* crl, X509* issuer);
+
+// Verifies the CRL issuer and certificate issuer name match.
+// return: true if equal, false if not.
+bool VerifyCrlCertIssuerNamesMatch(X509_CRL* crl, X509* cert);
+
+// Verifies the certificate in question has the cRLSign bit present.
+// return: true if cRLSign bit is present, false otherwise.
+bool HasCrlSignBit(X509* cert);
+
+// Gets a stable representation of the issuer name from an X509 certificate.
+// return: a std::string of the DER encoding of the X509_NAME issuer name.
+absl::StatusOr<std::string> IssuerFromCert(X509* cert);
+
+// Gets a stable representation of the authority key identifier from an X509
+// certificate.
+// return: a std::string of the DER encoding of the AKID or a status on failure.
+absl::StatusOr<std::string> AkidFromCertificate(X509* cert);
+
+// Gets a stable representation of the authority key identifier from an X509
+// crl.
+// return: a std::string of the DER encoding of the AKID or a status on failure.
+absl::StatusOr<std::string> AkidFromCrl(X509_CRL* crl);
+
+// Returns a vector of X509 instances parsed from the given PEM-encoded
+// certificate chain. Caller takes ownership of the X509 pointers in the output
+// vector.
+absl::StatusOr<std::vector<X509*>> ParsePemCertificateChain(
+    absl::string_view cert_chain_pem);
+
+// Returns an EVP_PKEY instance parsed from the non-empty PEM private key block
+// in private_key_pem. Caller takes ownership of the EVP_PKEY pointer.
+absl::StatusOr<EVP_PKEY*> ParsePemPrivateKey(absl::string_view private_key_pem);
 }  // namespace grpc_core
 
-#endif  // GRPC_CORE_TSI_SSL_TRANSPORT_SECURITY_UTILS_H
+#endif  // GRPC_SRC_CORE_TSI_SSL_TRANSPORT_SECURITY_UTILS_H

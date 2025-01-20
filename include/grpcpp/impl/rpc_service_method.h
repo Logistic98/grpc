@@ -1,23 +1,28 @@
-/*
- *
- * Copyright 2016 gRPC authors.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- *
- */
+//
+//
+// Copyright 2016 gRPC authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+//
 
 #ifndef GRPCPP_IMPL_RPC_SERVICE_METHOD_H
 #define GRPCPP_IMPL_RPC_SERVICE_METHOD_H
+
+#include <grpcpp/impl/rpc_method.h>
+#include <grpcpp/support/byte_buffer.h>
+#include <grpcpp/support/config.h>
+#include <grpcpp/support/status.h>
 
 #include <climits>
 #include <functional>
@@ -25,11 +30,8 @@
 #include <memory>
 #include <vector>
 
-#include <grpc/support/log.h>
-#include <grpcpp/impl/rpc_method.h>
-#include <grpcpp/support/byte_buffer.h>
-#include <grpcpp/support/config.h>
-#include <grpcpp/support/status.h>
+#include "absl/log/absl_check.h"
+#include "absl/log/absl_log.h"
 
 namespace grpc {
 class ServerContextBase;
@@ -68,14 +70,14 @@ class MethodHandler {
   };
   virtual void RunHandler(const HandlerParameter& param) = 0;
 
-  /* Returns a pointer to the deserialized request. \a status reflects the
-     result of deserialization. This pointer and the status should be filled in
-     a HandlerParameter and passed to RunHandler. It is illegal to access the
-     pointer after calling RunHandler. Ownership of the deserialized request is
-     retained by the handler. Returns nullptr if deserialization failed. */
+  // Returns a pointer to the deserialized request. \a status reflects the
+  // result of deserialization. This pointer and the status should be filled in
+  // a HandlerParameter and passed to RunHandler. It is illegal to access the
+  // pointer after calling RunHandler. Ownership of the deserialized request is
+  // retained by the handler. Returns nullptr if deserialization failed.
   virtual void* Deserialize(grpc_call* /*call*/, grpc_byte_buffer* req,
                             Status* /*status*/, void** /*handler_data*/) {
-    GPR_ASSERT(req == nullptr);
+    ABSL_CHECK_EQ(req, nullptr);
     return nullptr;
   }
 };
@@ -114,12 +116,12 @@ class RpcServiceMethod : public RpcMethod {
       // this is not an error condition, as it allows users to declare a server
       // like WithRawMethod_foo<AsyncService>. However since it
       // overwrites behavior, it should be logged.
-      gpr_log(
-          GPR_INFO,
-          "You are marking method %s as '%s', even though it was "
-          "previously marked '%s'. This behavior will overwrite the original "
-          "behavior. If you expected this then ignore this message.",
-          name(), TypeToString(api_type_), TypeToString(type));
+      ABSL_LOG(INFO)
+          << "You are marking method " << name() << " as '"
+          << TypeToString(api_type_)
+          << "', even though it was previously marked '" << TypeToString(type)
+          << "'. This behavior will overwrite the original behavior. If "
+             "you expected this then ignore this message.";
     }
     api_type_ = type;
   }

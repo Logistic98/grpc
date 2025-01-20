@@ -12,38 +12,46 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef GRPC_CORE_LIB_EVENT_ENGINE_DEFAULT_EVENT_ENGINE_H
-#define GRPC_CORE_LIB_EVENT_ENGINE_DEFAULT_EVENT_ENGINE_H
+#ifndef GRPC_SRC_CORE_LIB_EVENT_ENGINE_DEFAULT_EVENT_ENGINE_H
+#define GRPC_SRC_CORE_LIB_EVENT_ENGINE_DEFAULT_EVENT_ENGINE_H
 
+#include <grpc/event_engine/event_engine.h>
 #include <grpc/support/port_platform.h>
 
 #include <memory>
 
-#include <grpc/event_engine/event_engine.h>
+#include "src/core/config/core_configuration.h"
+#include "src/core/util/debug_location.h"
 
-#include "src/core/lib/config/core_configuration.h"
-#include "src/core/lib/promise/context.h"
-
-namespace grpc_core {
-template <>
-struct ContextType<grpc_event_engine::experimental::EventEngine> {};
-}  // namespace grpc_core
-
-namespace grpc_event_engine {
-namespace experimental {
-
-/// Access the shared global EventEngine instance.
-///
-/// The concept of a global EventEngine may go away in a post-iomgr world.
-/// Strongly consider whether you could use \a CreateEventEngine instead.
-std::shared_ptr<EventEngine> GetDefaultEventEngine();
+namespace grpc_event_engine::experimental {
 
 /// On ingress, ensure that an EventEngine exists in channel args via
 /// preconditioning.
 void RegisterEventEngineChannelArgPreconditioning(
     grpc_core::CoreConfiguration::Builder* builder);
 
-}  // namespace experimental
-}  // namespace grpc_event_engine
+/// Register a default EventEngine that is reset and destroyed when this object
+/// is destroyed.
+///
+/// Usage:
+///
+///   {
+///     DefaultEventEngineScope engine_holder(std::make_shared<MyEngine>());
+///     // returns the instance of MyEngine
+///     auto engine = GetDefaultEventEngine();
+///   }
+///   // returns some default internal instance. The previous instance has been
+///   // destroyed.
+///   auto engine = GetDefaultEventEngine();
+///
+class DefaultEventEngineScope {
+ public:
+  explicit DefaultEventEngineScope(std::shared_ptr<EventEngine> engine) {
+    SetDefaultEventEngine(std::move(engine));
+  }
+  ~DefaultEventEngineScope() { ShutdownDefaultEventEngine(); }
+};
 
-#endif  // GRPC_CORE_LIB_EVENT_ENGINE_DEFAULT_EVENT_ENGINE_H
+}  // namespace grpc_event_engine::experimental
+
+#endif  // GRPC_SRC_CORE_LIB_EVENT_ENGINE_DEFAULT_EVENT_ENGINE_H

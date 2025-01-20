@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef GRPC_CORE_LIB_SURFACE_INIT_INTERNALLY_H
-#define GRPC_CORE_LIB_SURFACE_INIT_INTERNALLY_H
+#ifndef GRPC_SRC_CORE_LIB_SURFACE_INIT_INTERNALLY_H
+#define GRPC_SRC_CORE_LIB_SURFACE_INIT_INTERNALLY_H
 
 namespace grpc_core {
 
@@ -26,12 +26,23 @@ extern bool (*IsInitializedInternally)();
 
 class KeepsGrpcInitialized {
  public:
-  KeepsGrpcInitialized() { InitInternally(); }
-  ~KeepsGrpcInitialized() { ShutdownInternally(); }
+  explicit KeepsGrpcInitialized(bool enabled = true) : enabled_(enabled) {
+    if (enabled_) {
+      InitInternally();
+    }
+  }
+  ~KeepsGrpcInitialized() {
+    if (enabled_) {
+      ShutdownInternally();
+    }
+  }
   KeepsGrpcInitialized(const KeepsGrpcInitialized&) = delete;
   KeepsGrpcInitialized& operator=(const KeepsGrpcInitialized&) = delete;
+
+ private:
+  bool enabled_;
 };
 
 }  // namespace grpc_core
 
-#endif  // GRPC_CORE_LIB_SURFACE_INIT_INTERNALLY_H
+#endif  // GRPC_SRC_CORE_LIB_SURFACE_INIT_INTERNALLY_H

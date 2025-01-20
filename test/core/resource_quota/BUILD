@@ -13,7 +13,7 @@
 # limitations under the License.
 
 load("//bazel:grpc_build_system.bzl", "grpc_cc_library", "grpc_cc_test", "grpc_package")
-load("//test/core/util:grpc_fuzzer.bzl", "grpc_proto_fuzzer")
+load("//test/core/test_util:grpc_fuzzer.bzl", "grpc_fuzz_test", "grpc_proto_fuzzer")
 
 licenses(["notice"])
 
@@ -33,13 +33,12 @@ grpc_cc_test(
     uses_event_engine = False,
     uses_polling = False,
     deps = [
-        "//:event_engine_base_hdrs",
         "//:exec_ctx",
         "//:gpr",
         "//:ref_counted_ptr",
         "//src/core:arena",
         "//src/core:resource_quota",
-        "//test/core/util:grpc_test_util_unsecure",
+        "//test/core/test_util:grpc_test_util_unsecure",
     ],
 )
 
@@ -47,6 +46,7 @@ grpc_cc_library(
     name = "call_checker",
     testonly = True,
     hdrs = ["call_checker.h"],
+    external_deps = ["absl/log:check"],
     language = "c++",
     deps = ["//:gpr"],
 )
@@ -67,7 +67,7 @@ grpc_cc_test(
         "//:exec_ctx",
         "//src/core:memory_quota",
         "//src/core:slice_refcount",
-        "//test/core/util:grpc_test_util_unsecure",
+        "//test/core/test_util:grpc_test_util_unsecure",
     ],
 )
 
@@ -108,7 +108,7 @@ grpc_cc_test(
     uses_polling = False,
     deps = [
         "//src/core:resource_quota",
-        "//test/core/util:grpc_test_util_unsecure",
+        "//test/core/test_util:grpc_test_util_unsecure",
     ],
 )
 
@@ -117,8 +117,8 @@ grpc_cc_test(
     srcs = ["memory_quota_stress_test.cc"],
     external_deps = [
         "absl/base:core_headers",
+        "absl/log:log",
         "absl/strings",
-        "absl/types:optional",
         "gtest",
     ],
     language = "c++",
@@ -136,7 +136,7 @@ grpc_cc_test(
         "//:gpr",
         "//src/core:event_engine_memory_allocator",
         "//src/core:memory_quota",
-        "//test/core/util:grpc_test_util_unsecure",
+        "//test/core/test_util:grpc_test_util_unsecure",
     ],
 )
 
@@ -147,10 +147,10 @@ grpc_proto_fuzzer(
     external_deps = [
         "absl/status",
         "absl/strings",
-        "absl/types:optional",
     ],
     language = "C++",
     proto = "memory_quota_fuzzer.proto",
+    proto_deps = ["//test/core/test_util:fuzz_config_vars_proto"],
     tags = ["no_windows"],
     uses_event_engine = False,
     uses_polling = False,
@@ -163,7 +163,24 @@ grpc_proto_fuzzer(
         "//src/core:closure",
         "//src/core:error",
         "//src/core:event_engine_memory_allocator",
+        "//src/core:experiments",
         "//src/core:memory_quota",
         "//src/core:useful",
+        "//test/core/test_util:fuzz_config_vars",
+        "//test/core/test_util:grpc_test_util",
+    ],
+)
+
+grpc_fuzz_test(
+    name = "arena_fuzztest",
+    srcs = ["arena_fuzztest.cc"],
+    external_deps = [
+        "fuzztest",
+        "fuzztest_main",
+        "gtest",
+    ],
+    deps = [
+        "//src/core:arena",
+        "//src/core:match",
     ],
 )

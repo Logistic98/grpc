@@ -1,20 +1,20 @@
-/*
- *
- * Copyright 2015 gRPC authors.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- *
- */
+//
+//
+// Copyright 2015 gRPC authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+//
 
 #include <grpc/support/port_platform.h>
 
@@ -26,10 +26,9 @@
 #include <sys/eventfd.h>
 #include <unistd.h>
 
-#include <grpc/support/log.h>
-
-#include "src/core/lib/gprpp/strerror.h"
 #include "src/core/lib/iomgr/wakeup_fd_posix.h"
+#include "src/core/util/crash.h"
+#include "src/core/util/strerror.h"
 
 static grpc_error_handle eventfd_create(grpc_wakeup_fd* fd_info) {
   fd_info->read_fd = eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
@@ -78,4 +77,4 @@ const grpc_wakeup_fd_vtable grpc_specialized_wakeup_fd_vtable = {
     eventfd_create, eventfd_consume, eventfd_wakeup, eventfd_destroy,
     eventfd_check_availability};
 
-#endif /* GRPC_LINUX_EVENTFD */
+#endif  // GRPC_LINUX_EVENTFD

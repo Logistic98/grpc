@@ -1,20 +1,20 @@
-/*
- *
- * Copyright 2017 gRPC authors.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- *
- */
+//
+//
+// Copyright 2017 gRPC authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+//
 
 #include <grpc/support/port_platform.h>
 
@@ -23,6 +23,7 @@
 #ifdef GRPC_HAVE_IFADDRS
 
 #include <errno.h>
+#include <grpc/support/alloc.h>
 #include <ifaddrs.h>
 #include <stddef.h>
 #include <string.h>
@@ -30,17 +31,16 @@
 
 #include <string>
 
+#include "absl/log/check.h"
+#include "absl/log/log.h"
 #include "absl/strings/str_cat.h"
-
-#include <grpc/support/alloc.h>
-#include <grpc/support/log.h>
-
 #include "src/core/lib/address_utils/sockaddr_utils.h"
 #include "src/core/lib/iomgr/error.h"
 #include "src/core/lib/iomgr/sockaddr.h"
 #include "src/core/lib/iomgr/tcp_server_utils_posix.h"
+#include "src/core/util/crash.h"
 
-/* Return the listener in s with address addr or NULL. */
+// Return the listener in s with address addr or NULL.
 static grpc_tcp_listener* find_listener_with_addr(grpc_tcp_server* s,
                                                   grpc_resolved_address* addr) {
   grpc_tcp_listener* l;
@@ -57,7 +57,7 @@ static grpc_tcp_listener* find_listener_with_addr(grpc_tcp_server* s,
   return l;
 }
 
-/* Bind to "::" to get a port number not used by any address. */
+// Bind to "::" to get a port number not used by any address.
 static grpc_error_handle get_unused_port(int* port) {
   grpc_resolved_address wild;
   grpc_sockaddr_make_wildcard6(0, &wild);
@@ -88,6 +88,12 @@ static grpc_error_handle get_unused_port(int* port) {
   return *port <= 0 ? GRPC_ERROR_CREATE("Bad port") : absl::OkStatus();
 }
 
+static bool grpc_is_ipv4_available() {
+  const int fd = socket(AF_INET, SOCK_DGRAM, 0);
+  if (fd >= 0) close(fd);
+  return fd >= 0;
+}
+
 grpc_error_handle grpc_tcp_server_add_all_local_addrs(grpc_tcp_server* s,
                                                       unsigned port_index,
                                                       int requested_port,
@@ -98,17 +104,20 @@ grpc_error_handle grpc_tcp_server_add_all_local_addrs(grpc_tcp_server* s,
   grpc_tcp_listener* sp = nullptr;
   grpc_error_handle err;
   if (requested_port == 0) {
-    /* Note: There could be a race where some local addrs can listen on the
-       selected port and some can't. The sane way to handle this would be to
-       retry by recreating the whole grpc_tcp_server. Backing out individual
-       listeners and orphaning the FDs looks like too much trouble. */
+    // Note: There could be a race where some local addrs can listen on the
+    // selected port and some can't. The sane way to handle this would be to
+    // retry by recreating the whole grpc_tcp_server. Backing out individual
+    // listeners and orphaning the FDs looks like too much trouble.
     if ((err = get_unused_port(&requested_port)) != absl::OkStatus()) {
       return err;
     } else if (requested_port <= 0) {
       return GRPC_ERROR_CREATE("Bad get_unused_port()");
     }
-    gpr_log(GPR_DEBUG, "Picked unused port %d", requested_port);
+    VLOG(2) << "Picked unused port " << requested_port;
   }
+
+  static bool v4_available = grpc_is_ipv4_available();
+
   if (getifaddrs(&ifa) != 0 || ifa == nullptr) {
     return GRPC_OS_ERROR(errno, "getifaddrs");
   }
@@ -120,6 +129,9 @@ grpc_error_handle grpc_tcp_server_add_all_local_addrs(grpc_tcp_server* s,
     if (ifa_it->ifa_addr == nullptr) {
       continue;
     } else if (ifa_it->ifa_addr->sa_family == AF_INET) {
+      if (!v4_available) {
+        continue;
+      }
       addr.len = static_cast<socklen_t>(sizeof(grpc_sockaddr_in));
     } else if (ifa_it->ifa_addr->sa_family == AF_INET6) {
       addr.len = static_cast<socklen_t>(sizeof(grpc_sockaddr_in6));
@@ -128,7 +140,7 @@ grpc_error_handle grpc_tcp_server_add_all_local_addrs(grpc_tcp_server* s,
     }
     memcpy(addr.addr, ifa_it->ifa_addr, addr.len);
     if (!grpc_sockaddr_set_port(&addr, requested_port)) {
-      /* Should never happen, because we check sa_family above. */
+      // Should never happen, because we check sa_family above.
       err = GRPC_ERROR_CREATE("Failed to set port");
       break;
     }
@@ -136,14 +148,14 @@ grpc_error_handle grpc_tcp_server_add_all_local_addrs(grpc_tcp_server* s,
     if (!addr_str.ok()) {
       return GRPC_ERROR_CREATE(addr_str.status().ToString());
     }
-    gpr_log(GPR_DEBUG,
-            "Adding local addr from interface %s flags 0x%x to server: %s",
-            ifa_name, ifa_it->ifa_flags, addr_str->c_str());
-    /* We could have multiple interfaces with the same address (e.g., bonding),
-       so look for duplicates. */
+    VLOG(2) << absl::StrFormat(
+        "Adding local addr from interface %s flags 0x%x to server: %s",
+        ifa_name, ifa_it->ifa_flags, addr_str->c_str());
+    // We could have multiple interfaces with the same address (e.g., bonding),
+    // so look for duplicates.
     if (find_listener_with_addr(s, &addr) != nullptr) {
-      gpr_log(GPR_DEBUG, "Skipping duplicate addr %s on interface %s",
-              addr_str->c_str(), ifa_name);
+      VLOG(2) << "Skipping duplicate addr " << *addr_str << " on interface "
+              << ifa_name;
       continue;
     }
     if ((err = grpc_tcp_server_add_addr(s, &addr, port_index, fd_index, &dsmode,
@@ -153,7 +165,7 @@ grpc_error_handle grpc_tcp_server_add_all_local_addrs(grpc_tcp_server* s,
       err = grpc_error_add_child(root_err, err);
       break;
     } else {
-      GPR_ASSERT(requested_port == new_sp->port);
+      CHECK(requested_port == new_sp->port);
       ++fd_index;
       if (sp != nullptr) {
         new_sp->is_sibling = 1;
@@ -175,4 +187,4 @@ grpc_error_handle grpc_tcp_server_add_all_local_addrs(grpc_tcp_server* s,
 
 bool grpc_tcp_server_have_ifaddrs(void) { return true; }
 
-#endif /* GRPC_HAVE_IFADDRS */
+#endif  // GRPC_HAVE_IFADDRS

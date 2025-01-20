@@ -20,7 +20,9 @@
 #include <stdlib.h>
 #include <sys/socket.h>
 
-#include <grpc/support/log.h>
+#include "absl/log/log.h"
+#include "absl/strings/str_format.h"
+#include "src/core/util/crash.h"
 
 namespace grpc_event_engine {
 namespace experimental {
@@ -49,12 +51,12 @@ int ConnectToServerOrDie(const ResolvedAddress& server_address) {
       pfd.events = POLLOUT;
       pfd.revents = 0;
       if (poll(&pfd, 1, -1) == -1) {
-        gpr_log(GPR_ERROR, "poll() failed during connect; errno=%d", errno);
+        LOG(ERROR) << "poll() failed during connect; errno=" << errno;
         abort();
       }
     } else {
-      gpr_log(GPR_ERROR, "Failed to connect to the server (errno=%d)", errno);
-      abort();
+      grpc_core::Crash(
+          absl::StrFormat("Failed to connect to the server (errno=%d)", errno));
     }
   }
   return client_fd;

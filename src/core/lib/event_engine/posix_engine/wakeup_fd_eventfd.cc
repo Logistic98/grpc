@@ -17,11 +17,8 @@
 #include <utility>
 
 #include "absl/strings/str_cat.h"
-#include "absl/strings/string_view.h"
-
-#include <grpc/support/log.h>  // IWYU pragma: keep
-
 #include "src/core/lib/iomgr/port.h"
+#include "src/core/util/crash.h"  // IWYU pragma: keep
 
 #ifdef GRPC_LINUX_EVENTFD
 
@@ -33,10 +30,9 @@
 #endif
 
 #include "src/core/lib/event_engine/posix_engine/wakeup_fd_eventfd.h"
-#include "src/core/lib/gprpp/strerror.h"
+#include "src/core/util/strerror.h"
 
-namespace grpc_event_engine {
-namespace experimental {
+namespace grpc_event_engine::experimental {
 
 #ifdef GRPC_LINUX_EVENTFD
 
@@ -105,13 +101,15 @@ EventFdWakeupFd::CreateEventFdWakeupFd() {
 
 #else  //  GRPC_LINUX_EVENTFD
 
-absl::Status EventFdWakeupFd::Init() { GPR_ASSERT(false && "unimplemented"); }
+#include "src/core/util/crash.h"
+
+absl::Status EventFdWakeupFd::Init() { grpc_core::Crash("unimplemented"); }
 
 absl::Status EventFdWakeupFd::ConsumeWakeup() {
-  GPR_ASSERT(false && "unimplemented");
+  grpc_core::Crash("unimplemented");
 }
 
-absl::Status EventFdWakeupFd::Wakeup() { GPR_ASSERT(false && "unimplemented"); }
+absl::Status EventFdWakeupFd::Wakeup() { grpc_core::Crash("unimplemented"); }
 
 bool EventFdWakeupFd::IsSupported() { return false; }
 
@@ -122,5 +120,4 @@ EventFdWakeupFd::CreateEventFdWakeupFd() {
 
 #endif  // GRPC_LINUX_EVENTFD
 
-}  // namespace experimental
-}  // namespace grpc_event_engine
+}  // namespace grpc_event_engine::experimental

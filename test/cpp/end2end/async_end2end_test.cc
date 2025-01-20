@@ -1,31 +1,23 @@
-/*
- *
- * Copyright 2015 gRPC authors.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- *
- */
-
-#include <cinttypes>
-#include <memory>
-#include <thread>
-
-#include "absl/memory/memory.h"
-#include "absl/strings/str_cat.h"
+//
+//
+// Copyright 2015 gRPC authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+//
 
 #include <grpc/grpc.h>
 #include <grpc/support/alloc.h>
-#include <grpc/support/log.h>
 #include <grpc/support/time.h>
 #include <grpcpp/channel.h>
 #include <grpcpp/client_context.h>
@@ -35,15 +27,26 @@
 #include <grpcpp/server_builder.h>
 #include <grpcpp/server_context.h>
 
-#include "src/core/ext/filters/client_channel/backup_poller.h"
-#include "src/core/lib/gprpp/debug_location.h"
+#include <cinttypes>
+#include <memory>
+#include <thread>
+
+#include "absl/log/check.h"
+#include "absl/log/log.h"
+#include "absl/memory/memory.h"
+#include "absl/strings/str_cat.h"
+#include "absl/strings/str_format.h"
+#include "src/core/client_channel/backup_poller.h"
+#include "src/core/config/config_vars.h"
 #include "src/core/lib/iomgr/port.h"
+#include "src/core/util/crash.h"
+#include "src/core/util/debug_location.h"
 #include "src/proto/grpc/health/v1/health.grpc.pb.h"
 #include "src/proto/grpc/testing/duplicate/echo_duplicate.grpc.pb.h"
 #include "src/proto/grpc/testing/echo.grpc.pb.h"
-#include "test/core/util/build.h"
-#include "test/core/util/port.h"
-#include "test/core/util/test_config.h"
+#include "test/core/test_util/build.h"
+#include "test/core/test_util/port.h"
+#include "test/core/test_util/test_config.h"
 #include "test/cpp/util/string_ref_helper.h"
 #include "test/cpp/util/test_credentials_provider.h"
 
@@ -125,7 +128,7 @@ class Verifier {
   // This version of Verify allows optionally ignoring the
   // outcome of the expectation
   void Verify(CompletionQueue* cq, bool ignore_ok) {
-    GPR_ASSERT(!expectations_.empty() || !maybe_expectations_.empty());
+    CHECK(!expectations_.empty() || !maybe_expectations_.empty());
     while (!expectations_.empty()) {
       Next(cq, ignore_ok);
     }
@@ -183,21 +186,18 @@ class Verifier {
         EXPECT_EQ(it->second.ok, ok) << it->second.ToString(it->first);
       }
       expectations_.erase(it);
-    } else {
-      auto it2 = maybe_expectations_.find(got_tag);
-      if (it2 != maybe_expectations_.end()) {
-        if (it2->second.seen != nullptr) {
-          EXPECT_FALSE(*it2->second.seen);
-          *it2->second.seen = true;
-        }
-        if (!ignore_ok) {
-          EXPECT_EQ(it2->second.ok, ok) << it->second.ToString(it->first);
-        }
-        maybe_expectations_.erase(it2);
-      } else {
-        gpr_log(GPR_ERROR, "Unexpected tag: %p", got_tag);
-        abort();
+    } else if (auto it2 = maybe_expectations_.find(got_tag);
+               it2 != maybe_expectations_.end()) {
+      if (it2->second.seen != nullptr) {
+        EXPECT_FALSE(*it2->second.seen);
+        *it2->second.seen = true;
       }
+      if (!ignore_ok) {
+        EXPECT_EQ(it2->second.ok, ok) << it->second.ToString(it->first);
+      }
+      maybe_expectations_.erase(it2);
+    } else {
+      grpc_core::Crash(absl::StrFormat("Unexpected tag: %p", got_tag));
     }
   }
 
@@ -232,7 +232,7 @@ bool plugin_has_sync_methods(std::unique_ptr<ServerBuilderPlugin>& plugin) {
 }
 
 // This class disables the server builder plugins that may add sync services to
-// the server. If there are sync services, UnimplementedRpc test will triger
+// the server. If there are sync services, UnimplementedRpc test will trigger
 // the sync unknown rpc routine on the server side, rather than the async one
 // that needs to be tested here.
 class ServerBuilderSyncPluginDisabler : public grpc::ServerBuilderOption {
@@ -273,7 +273,7 @@ std::ostream& operator<<(std::ostream& out, const TestScenario& scenario) {
 void TestScenario::Log() const {
   std::ostringstream out;
   out << *this;
-  gpr_log(GPR_DEBUG, "%s", out.str().c_str());
+  VLOG(2) << out.str();
 }
 
 class HealthCheck : public health::v1::Health::Service {};
@@ -320,11 +320,11 @@ class AsyncEnd2endTest : public ::testing::TestWithParam<TestScenario> {
     }
     cq_ = builder.AddCompletionQueue();
 
-    // TODO(zyc): make a test option to choose wheather sync plugins should be
+    // TODO(zyc): make a test option to choose whether sync plugins should be
     // deleted
     std::unique_ptr<ServerBuilderOption> sync_plugin_disabler(
         new ServerBuilderSyncPluginDisabler());
-    builder.SetOption(move(sync_plugin_disabler));
+    builder.SetOption(std::move(sync_plugin_disabler));
     server_ = builder.BuildAndStart();
   }
 
@@ -446,8 +446,7 @@ TEST_P(AsyncEnd2endTest, ReconnectChannel) {
 #ifdef GRPC_POSIX_SOCKET_EV
   // It needs 2 pollset_works to reconnect the channel with polling engine
   // "poll"
-  grpc_core::UniquePtr<char> poller = GPR_GLOBAL_CONFIG_GET(grpc_poll_strategy);
-  if (0 == strcmp(poller.get(), "poll")) {
+  if (grpc_core::ConfigVars::Get().PollStrategy() == "poll") {
     poller_slowdown_factor = 2;
   }
 #endif  // GRPC_POSIX_SOCKET_EV
@@ -1475,7 +1474,7 @@ class AsyncEnd2endServerTryCancelTest : public AsyncEnd2endTest {
       // just added
       int got_tag = verif.Expect(tag_idx, expected_server_cq_result)
                         .Next(cq_.get(), ignore_cq_result);
-      GPR_ASSERT((got_tag == tag_idx) || (got_tag == 11 && want_done_tag));
+      CHECK((got_tag == tag_idx) || (got_tag == 11 && want_done_tag));
       if (got_tag == 11) {
         EXPECT_TRUE(srv_ctx.IsCancelled());
         want_done_tag = false;
@@ -1625,7 +1624,7 @@ class AsyncEnd2endServerTryCancelTest : public AsyncEnd2endTest {
       // just added
       int got_tag = verif.Expect(tag_idx, expected_cq_result)
                         .Next(cq_.get(), ignore_cq_result);
-      GPR_ASSERT((got_tag == tag_idx) || (got_tag == 11 && want_done_tag));
+      CHECK((got_tag == tag_idx) || (got_tag == 11 && want_done_tag));
       if (got_tag == 11) {
         EXPECT_TRUE(srv_ctx.IsCancelled());
         want_done_tag = false;
@@ -1737,7 +1736,7 @@ class AsyncEnd2endServerTryCancelTest : public AsyncEnd2endTest {
 
       do {
         got_tag = verif.Next(cq_.get(), ignore_cq_result);
-        GPR_ASSERT(((got_tag == 3) && !tag_3_done) || (got_tag == 11));
+        CHECK(((got_tag == 3) && !tag_3_done) || (got_tag == 11));
         if (got_tag == 3) {
           tag_3_done = true;
         }
@@ -1765,17 +1764,16 @@ class AsyncEnd2endServerTryCancelTest : public AsyncEnd2endTest {
     verif.Expect(4, expected_cq_result);
     got_tag = tag_3_done ? 3 : verif.Next(cq_.get(), ignore_cq_result);
     got_tag2 = verif.Next(cq_.get(), ignore_cq_result);
-    GPR_ASSERT((got_tag == 3) || (got_tag == 4) ||
-               (got_tag == 11 && want_done_tag));
-    GPR_ASSERT((got_tag2 == 3) || (got_tag2 == 4) ||
-               (got_tag2 == 11 && want_done_tag));
+    CHECK((got_tag == 3) || (got_tag == 4) || (got_tag == 11 && want_done_tag));
+    CHECK((got_tag2 == 3) || (got_tag2 == 4) ||
+          (got_tag2 == 11 && want_done_tag));
     // If we get 3 and 4, we don't need to wait for 11, but if
     // we get 11, we should also clear 3 and 4
     if (got_tag + got_tag2 != 7) {
       EXPECT_TRUE(srv_ctx.IsCancelled());
       want_done_tag = false;
       got_tag = verif.Next(cq_.get(), ignore_cq_result);
-      GPR_ASSERT((got_tag == 3) || (got_tag == 4));
+      CHECK((got_tag == 3) || (got_tag == 4));
     }
 
     send_response.set_message("Pong");
@@ -1786,17 +1784,16 @@ class AsyncEnd2endServerTryCancelTest : public AsyncEnd2endTest {
     verif.Expect(6, expected_cq_result);
     got_tag = verif.Next(cq_.get(), ignore_cq_result);
     got_tag2 = verif.Next(cq_.get(), ignore_cq_result);
-    GPR_ASSERT((got_tag == 5) || (got_tag == 6) ||
-               (got_tag == 11 && want_done_tag));
-    GPR_ASSERT((got_tag2 == 5) || (got_tag2 == 6) ||
-               (got_tag2 == 11 && want_done_tag));
+    CHECK((got_tag == 5) || (got_tag == 6) || (got_tag == 11 && want_done_tag));
+    CHECK((got_tag2 == 5) || (got_tag2 == 6) ||
+          (got_tag2 == 11 && want_done_tag));
     // If we get 5 and 6, we don't need to wait for 11, but if
     // we get 11, we should also clear 5 and 6
     if (got_tag + got_tag2 != 11) {
       EXPECT_TRUE(srv_ctx.IsCancelled());
       want_done_tag = false;
       got_tag = verif.Next(cq_.get(), ignore_cq_result);
-      GPR_ASSERT((got_tag == 5) || (got_tag == 6));
+      CHECK((got_tag == 5) || (got_tag == 6));
     }
 
     // This is expected to succeed in all cases
@@ -1807,7 +1804,7 @@ class AsyncEnd2endServerTryCancelTest : public AsyncEnd2endTest {
     bool ignore_cq_wd_result =
         ignore_cq_result || (server_try_cancel == CANCEL_BEFORE_PROCESSING);
     got_tag = verif.Next(cq_.get(), ignore_cq_wd_result);
-    GPR_ASSERT((got_tag == 7) || (got_tag == 11 && want_done_tag));
+    CHECK((got_tag == 7) || (got_tag == 11 && want_done_tag));
     if (got_tag == 11) {
       EXPECT_TRUE(srv_ctx.IsCancelled());
       want_done_tag = false;
@@ -1822,7 +1819,7 @@ class AsyncEnd2endServerTryCancelTest : public AsyncEnd2endTest {
     srv_stream.Read(&recv_request, tag(8));
     verif.Expect(8, false);
     got_tag = verif.Next(cq_.get(), ignore_cq_result);
-    GPR_ASSERT((got_tag == 8) || (got_tag == 11 && want_done_tag));
+    CHECK((got_tag == 8) || (got_tag == 11 && want_done_tag));
     if (got_tag == 11) {
       EXPECT_TRUE(srv_ctx.IsCancelled());
       want_done_tag = false;
@@ -1917,7 +1914,7 @@ std::vector<TestScenario> CreateTestScenarios(bool /*test_secure*/,
   for (auto sec = sec_list.begin(); sec != sec_list.end(); sec++) {
     credentials_types.push_back(*sec);
   }
-  GPR_ASSERT(!credentials_types.empty());
+  CHECK(!credentials_types.empty());
 
   messages.push_back("Hello");
   if (test_message_size_limit) {
@@ -1970,7 +1967,9 @@ INSTANTIATE_TEST_SUITE_P(AsyncEnd2endServerTryCancel,
 int main(int argc, char** argv) {
   // Change the backup poll interval from 5s to 100ms to speed up the
   // ReconnectChannel test
-  GPR_GLOBAL_CONFIG_SET(grpc_client_channel_backup_poll_interval_ms, 100);
+  grpc_core::ConfigVars::Overrides overrides;
+  overrides.client_channel_backup_poll_interval_ms = 100;
+  grpc_core::ConfigVars::SetOverrides(overrides);
   grpc::testing::TestEnvironment env(&argc, argv);
   ::testing::InitGoogleTest(&argc, argv);
   int ret = RUN_ALL_TESTS();

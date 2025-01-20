@@ -12,28 +12,31 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef GRPC_CORE_LIB_PROMISE_ARENA_PROMISE_H
-#define GRPC_CORE_LIB_PROMISE_ARENA_PROMISE_H
+#ifndef GRPC_SRC_CORE_LIB_PROMISE_ARENA_PROMISE_H
+#define GRPC_SRC_CORE_LIB_PROMISE_ARENA_PROMISE_H
 
 #include <grpc/support/port_platform.h>
-
 #include <stdlib.h>
 
+#include <cstddef>
 #include <memory>
+#include <type_traits>
 #include <utility>
 
 #include "absl/meta/type_traits.h"
-
-#include "src/core/lib/gprpp/construct_destruct.h"
 #include "src/core/lib/promise/context.h"
 #include "src/core/lib/promise/poll.h"
 #include "src/core/lib/resource_quota/arena.h"
+#include "src/core/util/construct_destruct.h"
 
 namespace grpc_core {
 
 namespace arena_promise_detail {
 
-using ArgType = std::aligned_storage_t<sizeof(void*)>;
+struct ArgType {
+  alignas(std::max_align_t) char buffer[sizeof(void*)];
+};
+
 template <typename T>
 T*& ArgAsPtr(ArgType* arg) {
   static_assert(sizeof(ArgType) >= sizeof(T**),
@@ -227,4 +230,4 @@ class ArenaPromise {
 
 }  // namespace grpc_core
 
-#endif /* GRPC_CORE_LIB_PROMISE_ARENA_PROMISE_H */
+#endif  // GRPC_SRC_CORE_LIB_PROMISE_ARENA_PROMISE_H

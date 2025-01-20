@@ -12,17 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-/* Benchmark ChannelArgs comparison performance between grpc_channel_args and
- * grpc_core::ChannelArgs */
+// Benchmark ChannelArgs comparison performance between grpc_channel_args and
+// grpc_core::ChannelArgs
+
+#include <benchmark/benchmark.h>
+#include <grpcpp/support/channel_arguments.h>
 
 #include <random>
 
-#include <benchmark/benchmark.h>
-
 #include "absl/container/btree_map.h"
-
-#include <grpcpp/support/channel_arguments.h>
-
 #include "src/core/lib/channel/channel_args.h"
 
 const char kKey[] = "a very long key";

@@ -12,23 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef GRPC_CORE_LIB_PROMISE_MAP_PIPE_H
-#define GRPC_CORE_LIB_PROMISE_MAP_PIPE_H
+#ifndef GRPC_SRC_CORE_LIB_PROMISE_MAP_PIPE_H
+#define GRPC_SRC_CORE_LIB_PROMISE_MAP_PIPE_H
 
 #include <grpc/support/port_platform.h>
 
+#include "absl/log/log.h"
 #include "absl/status/status.h"
-
 #include "src/core/lib/promise/detail/promise_factory.h"
 #include "src/core/lib/promise/for_each.h"
 #include "src/core/lib/promise/map.h"
 #include "src/core/lib/promise/pipe.h"
+#include "src/core/lib/promise/poll.h"
+#include "src/core/lib/promise/try_seq.h"
 
 namespace grpc_core {
 
 // Apply a (possibly async) mapping function to src, and output into dst.
 //
-// In psuedo-code:
+// In pseudo-code:
 // for each element in wait_for src.Next:
 //   x = wait_for filter_factory(element)
 //   wait_for dst.Push(x)
@@ -39,14 +41,21 @@ auto MapPipe(PipeReceiver<T> src, PipeSender<T> dst, Filter filter_factory) {
       [filter_factory = promise_detail::RepeatedPromiseFactory<T, Filter>(
            std::move(filter_factory)),
        dst = std::move(dst)](T t) mutable {
-        return TrySeq(filter_factory.Make(std::move(t)), [&dst](T t) {
-          return Map(dst.Push(std::move(t)), [](bool successful_push) {
-            if (successful_push) {
-              return absl::OkStatus();
-            }
-            return absl::CancelledError();
-          });
-        });
+        return TrySeq(
+            [] {
+              GRPC_TRACE_VLOG(promise_primitives, 2) << "MapPipe: start map";
+              return Empty{};
+            },
+            filter_factory.Make(std::move(t)),
+            [&dst](T t) {
+              GRPC_TRACE_VLOG(promise_primitives, 2) << "MapPipe: start push";
+              return Map(dst.Push(std::move(t)), [](bool successful_push) {
+                if (successful_push) {
+                  return absl::OkStatus();
+                }
+                return absl::CancelledError();
+              });
+            });
       });
 }
 
@@ -84,4 +93,4 @@ class PipeMapper {
 
 }  // namespace grpc_core
 
-#endif  // GRPC_CORE_LIB_PROMISE_MAP_PIPE_H
+#endif  // GRPC_SRC_CORE_LIB_PROMISE_MAP_PIPE_H

@@ -14,19 +14,14 @@
 
 #include "src/core/lib/promise/for_each.h"
 
-#include <stdint.h>
+#include <grpc/event_engine/memory_allocator.h>
 
 #include <memory>
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-
-#include <grpc/event_engine/memory_allocator.h>
-
-#include "src/core/lib/gprpp/ref_counted_ptr.h"
 #include "src/core/lib/promise/activity.h"
-#include "src/core/lib/promise/detail/basic_join.h"
-#include "src/core/lib/promise/detail/basic_seq.h"
+#include "src/core/lib/promise/inter_activity_pipe.h"
 #include "src/core/lib/promise/join.h"
 #include "src/core/lib/promise/map.h"
 #include "src/core/lib/promise/pipe.h"
@@ -35,6 +30,7 @@
 #include "src/core/lib/resource_quota/arena.h"
 #include "src/core/lib/resource_quota/memory_quota.h"
 #include "src/core/lib/resource_quota/resource_quota.h"
+#include "src/core/util/ref_counted_ptr.h"
 #include "test/core/promise/test_wakeup_schedulers.h"
 
 using testing::Mock;
@@ -43,13 +39,7 @@ using testing::StrictMock;
 
 namespace grpc_core {
 
-class ForEachTest : public ::testing::Test {
- protected:
-  MemoryAllocator memory_allocator_ = MemoryAllocator(
-      ResourceQuota::Default()->memory_quota()->CreateMemoryAllocator("test"));
-};
-
-TEST_F(ForEachTest, SendThriceWithPipe) {
+TEST(ForEachTest, SendThriceWithPipe) {
   int num_received = 0;
   StrictMock<MockFunction<void(absl::Status)>> on_done;
   EXPECT_CALL(on_done, Call(absl::OkStatus()));
@@ -79,8 +69,46 @@ TEST_F(ForEachTest, SendThriceWithPipe) {
       },
       NoWakeupScheduler(),
       [&on_done](absl::Status status) { on_done.Call(std::move(status)); },
-      MakeScopedArena(1024, &memory_allocator_));
+      SimpleArenaAllocator()->MakeArena());
   Mock::VerifyAndClearExpectations(&on_done);
+  EXPECT_EQ(num_received, 3);
+}
+
+TEST(ForEachTest, SendThriceWithInterActivityPipe) {
+  int num_received = 0;
+  StrictMock<MockFunction<void(absl::Status)>> on_done_sender;
+  StrictMock<MockFunction<void(absl::Status)>> on_done_receiver;
+  EXPECT_CALL(on_done_sender, Call(absl::OkStatus()));
+  EXPECT_CALL(on_done_receiver, Call(absl::OkStatus()));
+  InterActivityPipe<int, 1> pipe;
+  auto send_activity = MakeActivity(
+      Seq(
+          // Push 3 things into a pipe -- 1, 2, then 3 -- then close.
+          pipe.sender.Push(1), [&pipe] { return pipe.sender.Push(2); },
+          [&pipe] { return pipe.sender.Push(3); },
+          [&pipe] {
+            auto x = std::move(pipe.sender);
+            return absl::OkStatus();
+          }),
+      InlineWakeupScheduler{}, [&on_done_sender](absl::Status status) {
+        on_done_sender.Call(std::move(status));
+      });
+  MakeActivity(
+      [&num_received, &pipe] {
+        // Use a ForEach loop to read them out and verify
+        // all values are seen.
+        return ForEach(std::move(pipe.receiver), [&num_received](int i) {
+          num_received++;
+          EXPECT_EQ(num_received, i);
+          return absl::OkStatus();
+        });
+      },
+      NoWakeupScheduler(),
+      [&on_done_receiver](absl::Status status) {
+        on_done_receiver.Call(std::move(status));
+      });
+  Mock::VerifyAndClearExpectations(&on_done_sender);
+  Mock::VerifyAndClearExpectations(&on_done_receiver);
   EXPECT_EQ(num_received, 3);
 }
 
@@ -103,7 +131,7 @@ class MoveableUntilPolled {
   }
 
   Poll<absl::Status> operator()() {
-    Activity::current()->ForceImmediateRepoll();
+    GetContext<Activity>()->ForceImmediateRepoll();
     ++polls_;
     if (polls_ == 10) return absl::OkStatus();
     return Pending();
@@ -113,7 +141,7 @@ class MoveableUntilPolled {
   int polls_ = 0;
 };
 
-TEST_F(ForEachTest, NoMoveAfterPoll) {
+TEST(ForEachTest, NoMoveAfterPoll) {
   int num_received = 0;
   StrictMock<MockFunction<void(absl::Status)>> on_done;
   EXPECT_CALL(on_done, Call(absl::OkStatus()));
@@ -144,12 +172,12 @@ TEST_F(ForEachTest, NoMoveAfterPoll) {
       },
       NoWakeupScheduler(),
       [&on_done](absl::Status status) { on_done.Call(std::move(status)); },
-      MakeScopedArena(1024, &memory_allocator_));
+      SimpleArenaAllocator()->MakeArena());
   Mock::VerifyAndClearExpectations(&on_done);
   EXPECT_EQ(num_received, 1);
 }
 
-TEST_F(ForEachTest, NextResultHeldThroughCallback) {
+TEST(ForEachTest, NextResultHeldThroughCallback) {
   int num_received = 0;
   StrictMock<MockFunction<void(absl::Status)>> on_done;
   EXPECT_CALL(on_done, Call(absl::OkStatus()));
@@ -177,8 +205,7 @@ TEST_F(ForEachTest, NextResultHeldThroughCallback) {
                           // sender->reset() line above yet either, as
                           // the Push() should block until this code
                           // completes.
-                          EXPECT_TRUE(absl::holds_alternative<Pending>(
-                              (*sender)->Push(2)()));
+                          EXPECT_TRUE((*sender)->Push(2)().pending());
                           num_received++;
                           EXPECT_EQ(num_received, i);
                           return TrySeq(
@@ -188,8 +215,7 @@ TEST_F(ForEachTest, NextResultHeldThroughCallback) {
                                 // Perform the same test verifying the same
                                 // properties for NextResult holding: all should
                                 // still be true.
-                                EXPECT_TRUE(absl::holds_alternative<Pending>(
-                                    (*sender)->Push(2)()));
+                                EXPECT_TRUE((*sender)->Push(2)().pending());
                                 return absl::OkStatus();
                               });
                         })),
@@ -197,7 +223,7 @@ TEST_F(ForEachTest, NextResultHeldThroughCallback) {
       },
       NoWakeupScheduler(),
       [&on_done](absl::Status status) { on_done.Call(std::move(status)); },
-      MakeScopedArena(1024, &memory_allocator_));
+      SimpleArenaAllocator()->MakeArena());
   Mock::VerifyAndClearExpectations(&on_done);
   EXPECT_EQ(num_received, 1);
 }

@@ -13,7 +13,7 @@
 # limitations under the License.
 
 load("//bazel:grpc_build_system.bzl", "grpc_cc_test", "grpc_package")
-load("//test/core/util:grpc_fuzzer.bzl", "grpc_proto_fuzzer")
+load("//test/core/test_util:grpc_fuzzer.bzl", "grpc_proto_fuzzer")
 
 licenses(["notice"])
 
@@ -23,21 +23,24 @@ grpc_package(
 )
 
 grpc_cc_test(
-    name = "work_queue_test",
-    srcs = ["work_queue_test.cc"],
+    name = "basic_work_queue_test",
+    srcs = ["basic_work_queue_test.cc"],
     external_deps = ["gtest"],
     deps = [
         "//:exec_ctx",
         "//:gpr_platform",
         "//src/core:common_event_engine_closures",
-        "//src/core:event_engine_work_queue",
-        "//test/core/util:grpc_test_util_unsecure",
+        "//src/core:event_engine_basic_work_queue",
+        "//test/core/test_util:grpc_test_util_unsecure",
     ],
 )
 
+# TODO(hork): the same fuzzer configuration should work trivially for all
+# WorkQueue implementations. Generalize it when another implementation is
+# written.
 grpc_proto_fuzzer(
-    name = "work_queue_fuzzer",
-    srcs = ["work_queue_fuzzer.cc"],
+    name = "basic_work_queue_fuzzer",
+    srcs = ["basic_work_queue_fuzzer.cc"],
     corpus = "corpora",
     language = "C++",
     proto = "work_queue_fuzzer.proto",
@@ -45,7 +48,7 @@ grpc_proto_fuzzer(
     uses_event_engine = False,
     uses_polling = False,
     deps = [
-        "//src/core:event_engine_work_queue",
-        "//test/core/util:grpc_test_util",
+        "//src/core:event_engine_basic_work_queue",
+        "//test/core/test_util:grpc_test_util",
     ],
 )

@@ -1,28 +1,20 @@
-/*
- *
- * Copyright 2018 gRPC authors.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- *
- */
-
-#include <memory>
-#include <vector>
-
-#include <gtest/gtest.h>
-
-#include "absl/memory/memory.h"
-#include "absl/strings/match.h"
+//
+//
+// Copyright 2018 gRPC authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+//
 
 #include <grpcpp/channel.h>
 #include <grpcpp/client_context.h>
@@ -33,10 +25,16 @@
 #include <grpcpp/server_builder.h>
 #include <grpcpp/server_context.h>
 #include <grpcpp/support/server_interceptor.h>
+#include <gtest/gtest.h>
 
+#include <memory>
+#include <vector>
+
+#include "absl/memory/memory.h"
+#include "absl/strings/match.h"
 #include "src/proto/grpc/testing/echo.grpc.pb.h"
-#include "test/core/util/port.h"
-#include "test/core/util/test_config.h"
+#include "test/core/test_util/port.h"
+#include "test/core/test_util/test_config.h"
 #include "test/cpp/end2end/interceptors_util.h"
 #include "test/cpp/end2end/test_service_impl.h"
 #include "test/cpp/util/byte_buffer_proto_helper.h"
@@ -96,9 +94,9 @@ class LoggingInterceptor : public experimental::Interceptor {
       auto* map = methods->GetSendTrailingMetadata();
       bool found = false;
       // Check that we received the metadata as an echo
-      for (const auto& pair : *map) {
-        found = absl::StartsWith(pair.first, "testkey") &&
-                absl::StartsWith(pair.second, "testvalue");
+      for (const auto& [key, value] : *map) {
+        found = absl::StartsWith(key, "testkey") &&
+                absl::StartsWith(value, "testvalue");
         if (found) break;
       }
       EXPECT_EQ(found, true);
@@ -110,9 +108,8 @@ class LoggingInterceptor : public experimental::Interceptor {
       auto* map = methods->GetRecvInitialMetadata();
       bool found = false;
       // Check that we received the metadata as an echo
-      for (const auto& pair : *map) {
-        found = pair.first.find("testkey") == 0 &&
-                pair.second.find("testvalue") == 0;
+      for (const auto& [key, value] : *map) {
+        found = key.starts_with("testkey") && value.starts_with("testvalue");
         if (found) break;
       }
       EXPECT_EQ(found, true);

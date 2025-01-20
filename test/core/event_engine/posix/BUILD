@@ -13,6 +13,7 @@
 # limitations under the License.
 
 load("//bazel:grpc_build_system.bzl", "grpc_cc_library", "grpc_cc_test", "grpc_package")
+load("//test/cpp/microbenchmarks:grpc_benchmark_config.bzl", "grpc_cc_benchmark")
 
 licenses(["notice"])
 
@@ -26,21 +27,25 @@ grpc_cc_library(
     testonly = True,
     srcs = ["posix_engine_test_utils.cc"],
     hdrs = ["posix_engine_test_utils.h"],
+    external_deps = ["absl/log:log"],
     tags = [
         "no_windows",
     ],
-    visibility = ["//test:__subpackages__"],
+    visibility = ["//visibility:private"],
     deps = [
         "//src/core:event_engine_common",
         "//src/core:posix_event_engine_event_poller",
-        "//test/core/util:grpc_test_util",
+        "//test/core/test_util:grpc_test_util",
     ],
 )
 
 grpc_cc_test(
     name = "timer_heap_test",
     srcs = ["timer_heap_test.cc"],
-    external_deps = ["gtest"],
+    external_deps = [
+        "absl/log:check",
+        "gtest",
+    ],
     language = "C++",
     uses_event_engine = False,
     uses_polling = False,
@@ -65,7 +70,10 @@ grpc_cc_test(
 grpc_cc_test(
     name = "timer_manager_test",
     srcs = ["timer_manager_test.cc"],
-    external_deps = ["gtest"],
+    external_deps = [
+        "absl/log:log",
+        "gtest",
+    ],
     language = "C++",
     uses_event_engine = False,
     uses_polling = False,
@@ -73,14 +81,17 @@ grpc_cc_test(
         "//:exec_ctx",
         "//src/core:common_event_engine_closures",
         "//src/core:posix_event_engine_timer_manager",
-        "//test/core/util:grpc_test_util",
+        "//test/core/test_util:grpc_test_util",
     ],
 )
 
 grpc_cc_test(
     name = "event_poller_posix_test",
     srcs = ["event_poller_posix_test.cc"],
-    external_deps = ["gtest"],
+    external_deps = [
+        "absl/log:log",
+        "gtest",
+    ],
     language = "C++",
     tags = [
         "no_windows",
@@ -95,26 +106,23 @@ grpc_cc_test(
         "//src/core:posix_event_engine_event_poller",
         "//src/core:posix_event_engine_poller_posix_default",
         "//test/core/event_engine/posix:posix_engine_test_utils",
-        "//test/core/util:grpc_test_util",
+        "//test/core/test_util:grpc_test_util",
     ],
 )
 
-grpc_cc_test(
+grpc_cc_benchmark(
     name = "lock_free_event_test",
     srcs = ["lock_free_event_test.cc"],
-    external_deps = ["gtest"],
-    language = "C++",
-    tags = [
-        "no_windows",
+    external_deps = [
+        "gtest",
     ],
     uses_event_engine = True,
-    uses_polling = False,
     deps = [
         "//src/core:posix_event_engine",
         "//src/core:posix_event_engine_closure",
         "//src/core:posix_event_engine_event_poller",
         "//src/core:posix_event_engine_lockfree_event",
-        "//test/core/util:grpc_test_util",
+        "//test/core/test_util:grpc_test_util",
     ],
 )
 
@@ -131,14 +139,17 @@ grpc_cc_test(
     deps = [
         "//src/core:posix_event_engine_wakeup_fd_posix_eventfd",
         "//src/core:posix_event_engine_wakeup_fd_posix_pipe",
-        "//test/core/util:grpc_test_util",
+        "//test/core/test_util:grpc_test_util",
     ],
 )
 
 grpc_cc_test(
     name = "traced_buffer_list_test",
     srcs = ["traced_buffer_list_test.cc"],
-    external_deps = ["gtest"],
+    external_deps = [
+        "absl/log:check",
+        "gtest",
+    ],
     language = "C++",
     tags = [
         "no_windows",
@@ -147,7 +158,7 @@ grpc_cc_test(
     uses_polling = False,
     deps = [
         "//src/core:posix_event_engine_traced_buffer_list",
-        "//test/core/util:grpc_test_util",
+        "//test/core/test_util:grpc_test_util",
     ],
 )
 
@@ -165,14 +176,18 @@ grpc_cc_test(
         "//src/core:event_engine_common",
         "//src/core:posix_event_engine_tcp_socket_utils",
         "//src/core:socket_mutator",
-        "//test/core/util:grpc_test_util",
+        "//test/core/test_util:grpc_test_util",
     ],
 )
 
 grpc_cc_test(
     name = "posix_endpoint_test",
     srcs = ["posix_endpoint_test.cc"],
-    external_deps = ["gtest"],
+    external_deps = [
+        "absl/log:check",
+        "absl/log:log",
+        "gtest",
+    ],
     language = "C++",
     tags = [
         "no_windows",
@@ -188,17 +203,20 @@ grpc_cc_test(
         "//src/core:posix_event_engine_endpoint",
         "//src/core:posix_event_engine_event_poller",
         "//src/core:posix_event_engine_poller_posix_default",
+        "//test/core/event_engine:event_engine_test_utils",
         "//test/core/event_engine/posix:posix_engine_test_utils",
-        "//test/core/event_engine/test_suite:conformance_test_base_lib",
-        "//test/core/event_engine/test_suite:oracle_event_engine_posix",
-        "//test/core/util:grpc_test_util",
+        "//test/core/event_engine/test_suite/posix:oracle_event_engine_posix",
+        "//test/core/test_util:grpc_test_util",
     ],
 )
 
 grpc_cc_test(
     name = "posix_engine_listener_utils_test",
     srcs = ["posix_engine_listener_utils_test.cc"],
-    external_deps = ["gtest"],
+    external_deps = [
+        "absl/log:log",
+        "gtest",
+    ],
     language = "C++",
     tags = [
         "no_windows",
@@ -210,16 +228,21 @@ grpc_cc_test(
         "//src/core:posix_event_engine_listener_utils",
         "//src/core:posix_event_engine_tcp_socket_utils",
         "//src/core:socket_mutator",
-        "//test/core/util:grpc_test_util",
+        "//test/core/test_util:grpc_test_util",
     ],
 )
 
 grpc_cc_test(
     name = "posix_event_engine_connect_test",
     srcs = ["posix_event_engine_connect_test.cc"],
-    external_deps = ["gtest"],
+    external_deps = [
+        "absl/log:check",
+        "absl/log:log",
+        "gtest",
+    ],
     language = "C++",
     tags = [
+        "no_mac",
         "no_windows",
     ],
     uses_event_engine = True,
@@ -232,8 +255,27 @@ grpc_cc_test(
         "//src/core:posix_event_engine_endpoint",
         "//src/core:posix_event_engine_event_poller",
         "//src/core:posix_event_engine_poller_posix_default",
-        "//test/core/event_engine/test_suite:conformance_test_base_lib",
-        "//test/core/event_engine/test_suite:oracle_event_engine_posix",
-        "//test/core/util:grpc_test_util",
+        "//test/core/event_engine:event_engine_test_utils",
+        "//test/core/event_engine/test_suite/posix:oracle_event_engine_posix",
+        "//test/core/test_util:grpc_test_util",
+    ],
+)
+
+grpc_cc_test(
+    name = "log_too_many_open_files_test",
+    srcs = ["log_too_many_open_files_test.cc"],
+    external_deps = [
+        "gtest",
+    ],
+    language = "C++",
+    tags = [
+        "no_windows",
+    ],
+    uses_event_engine = False,
+    uses_polling = False,
+    deps = [
+        "//:grpc",
+        "//src/core:posix_event_engine",
+        "//test/core/test_util:grpc_test_util",
     ],
 )

@@ -1,38 +1,37 @@
-/*
- *
- * Copyright 2015 gRPC authors.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- *
- */
-
-#include <string.h>
+//
+//
+// Copyright 2015 gRPC authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+//
 
 #include <gtest/gtest.h>
+#include <string.h>
 
-#include <grpc/support/log.h>
-
-#include "src/core/lib/gpr/string.h"
-#include "src/core/lib/gprpp/ref_counted_ptr.h"
+#include "absl/log/log.h"
 #include "src/core/lib/security/context/security_context.h"
-#include "test/core/util/test_config.h"
+#include "src/core/util/crash.h"
+#include "src/core/util/ref_counted_ptr.h"
+#include "src/core/util/string.h"
+#include "test/core/test_util/test_config.h"
 
 TEST(AuthContextTest, EmptyContext) {
   grpc_core::RefCountedPtr<grpc_auth_context> ctx =
       grpc_core::MakeRefCounted<grpc_auth_context>(nullptr);
   grpc_auth_property_iterator it;
 
-  gpr_log(GPR_INFO, "test_empty_context");
+  LOG(INFO) << "test_empty_context";
   ASSERT_NE(ctx, nullptr);
   ASSERT_EQ(grpc_auth_context_peer_identity_property_name(ctx.get()), nullptr);
   it = grpc_auth_context_peer_identity(ctx.get());
@@ -53,7 +52,7 @@ TEST(AuthContextTest, SimpleContext) {
   grpc_auth_property_iterator it;
   size_t i;
 
-  gpr_log(GPR_INFO, "test_simple_context");
+  LOG(INFO) << "test_simple_context";
   ASSERT_NE(ctx, nullptr);
   grpc_auth_context_add_cstring_property(ctx.get(), "name", "chapi");
   grpc_auth_context_add_cstring_property(ctx.get(), "name", "chapo");
@@ -93,7 +92,7 @@ TEST(AuthContextTest, ChainedContext) {
   grpc_auth_property_iterator it;
   size_t i;
 
-  gpr_log(GPR_INFO, "test_chained_context");
+  LOG(INFO) << "test_chained_context";
   grpc_auth_context_add_cstring_property(chained_ptr, "name", "padapo");
   grpc_auth_context_add_cstring_property(chained_ptr, "foo", "baz");
   grpc_auth_context_add_cstring_property(ctx.get(), "name", "chapi");

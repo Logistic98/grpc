@@ -1,30 +1,30 @@
-/*
- *
- * Copyright 2018 gRPC authors.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- *
- */
-
-#include <grpc/support/port_platform.h>
+//
+//
+// Copyright 2018 gRPC authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+//
 
 #include "src/core/lib/iomgr/buffer_list.h"
 
-#include <grpc/support/log.h>
+#include <grpc/support/port_platform.h>
 #include <grpc/support/time.h>
 
-#include "src/core/lib/gprpp/sync.h"
+#include "absl/log/log.h"
 #include "src/core/lib/iomgr/port.h"
+#include "src/core/util/crash.h"
+#include "src/core/util/sync.h"
 
 #ifdef GRPC_LINUX_ERRQUEUE
 #include <netinet/in.h>
@@ -41,8 +41,8 @@ void FillGprFromTimestamp(gpr_timespec* gts, const struct timespec* ts) {
 }
 
 void DefaultTimestampsCallback(void* /*arg*/, Timestamps* /*ts*/,
-                               absl::Status /*shudown_err*/) {
-  gpr_log(GPR_DEBUG, "Timestamps callback has not been registered");
+                               absl::Status /*shutdown_err*/) {
+  VLOG(2) << "Timestamps callback has not been registered";
 }
 
 // The saved callback function that will be invoked when we get all the
@@ -277,6 +277,8 @@ void TracedBufferList::ProcessTimestamp(struct sock_extended_err* serr,
       elem = elem->next_;
       continue;
     }
+    g_timestamps_callback(elem->arg_, &(elem->ts_),
+                          absl::DeadlineExceededError("Ack timed out"));
     if (prev != nullptr) {
       prev->next_ = elem->next_;
       delete elem;
@@ -308,9 +310,9 @@ void grpc_tcp_set_write_timestamps_callback(
     void (*fn)(void*, Timestamps*, grpc_error_handle error)) {
   g_timestamps_callback = fn;
 }
-} /* namespace grpc_core */
+}  // namespace grpc_core
 
-#else /* GRPC_LINUX_ERRQUEUE */
+#else  // GRPC_LINUX_ERRQUEUE
 
 namespace grpc_core {
 void grpc_tcp_set_write_timestamps_callback(
@@ -319,8 +321,8 @@ void grpc_tcp_set_write_timestamps_callback(
   // Can't comment out the name because some compilers and formatters don't
   // like the sequence */* , which would arise from */*fn*/.
   (void)fn;
-  gpr_log(GPR_DEBUG, "Timestamps callback is not enabled for this platform");
+  VLOG(2) << "Timestamps callback is not enabled for this platform";
 }
 }  // namespace grpc_core
 
-#endif /* GRPC_LINUX_ERRQUEUE */
+#endif  // GRPC_LINUX_ERRQUEUE

@@ -1,34 +1,36 @@
-/*
- *
- * Copyright 2018 gRPC authors.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- *
- */
+//
+//
+// Copyright 2018 gRPC authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+//
 
 #ifndef GRPCPP_SUPPORT_CALLBACK_COMMON_H
 #define GRPCPP_SUPPORT_CALLBACK_COMMON_H
 
-#include <functional>
-
 #include <grpc/grpc.h>
 #include <grpc/impl/grpc_types.h>
-#include <grpc/support/log.h>
 #include <grpcpp/impl/call.h>
 #include <grpcpp/impl/codegen/channel_interface.h>
 #include <grpcpp/impl/completion_queue_tag.h>
 #include <grpcpp/support/config.h>
+#include <grpcpp/support/global_callback_hook.h>
 #include <grpcpp/support/status.h>
+
+#include <functional>
+
+#include "absl/log/absl_check.h"
 
 namespace grpc {
 namespace internal {
@@ -71,7 +73,7 @@ class CallbackWithStatusTag : public grpc_completion_queue_functor {
  public:
   // always allocated against a call arena, no memory free required
   static void operator delete(void* /*ptr*/, std::size_t size) {
-    GPR_ASSERT(size == sizeof(CallbackWithStatusTag));
+    ABSL_CHECK_EQ(size, sizeof(CallbackWithStatusTag));
   }
 
   // This operator should never be called as the memory should be freed as part
@@ -79,7 +81,7 @@ class CallbackWithStatusTag : public grpc_completion_queue_functor {
   // delete to the operator new so that some compilers will not complain (see
   // https://github.com/grpc/grpc/issues/11301) Note at the time of adding this
   // there are no tests catching the compiler warning.
-  static void operator delete(void*, void*) { GPR_ASSERT(false); }
+  static void operator delete(void*, void*) { ABSL_CHECK(false); }
 
   CallbackWithStatusTag(grpc_call* call, std::function<void(Status)> f,
                         CompletionQueueTag* ops)
@@ -118,14 +120,25 @@ class CallbackWithStatusTag : public grpc_completion_queue_functor {
       // The tag was swallowed
       return;
     }
-    GPR_ASSERT(ignored == ops_);
+    ABSL_CHECK(ignored == ops_);
 
     // Last use of func_ or status_, so ok to move them out
     auto func = std::move(func_);
     auto status = std::move(status_);
     func_ = nullptr;     // reset to clear this out for sure
     status_ = Status();  // reset to clear this out for sure
-    CatchingCallback(std::move(func), std::move(status));
+    GetGlobalCallbackHook()->RunCallback(
+        call_, [func = std::move(func), status = std::move(status)]() {
+#if GRPC_ALLOW_EXCEPTIONS
+          try {
+            func(status);
+          } catch (...) {
+            // nothing to return or change here, just don't crash the library
+          }
+#else   // GRPC_ALLOW_EXCEPTIONS
+  func(status);
+#endif  // GRPC_ALLOW_EXCEPTIONS
+        });
     grpc_call_unref(call_);
   }
 };
@@ -137,7 +150,7 @@ class CallbackWithSuccessTag : public grpc_completion_queue_functor {
  public:
   // always allocated against a call arena, no memory free required
   static void operator delete(void* /*ptr*/, std::size_t size) {
-    GPR_ASSERT(size == sizeof(CallbackWithSuccessTag));
+    ABSL_CHECK_EQ(size, sizeof(CallbackWithSuccessTag));
   }
 
   // This operator should never be called as the memory should be freed as part
@@ -145,7 +158,7 @@ class CallbackWithSuccessTag : public grpc_completion_queue_functor {
   // delete to the operator new so that some compilers will not complain (see
   // https://github.com/grpc/grpc/issues/11301) Note at the time of adding this
   // there are no tests catching the compiler warning.
-  static void operator delete(void*, void*) { GPR_ASSERT(false); }
+  static void operator delete(void*, void*) { ABSL_CHECK(false); }
 
   CallbackWithSuccessTag() : call_(nullptr) {}
 
@@ -162,7 +175,7 @@ class CallbackWithSuccessTag : public grpc_completion_queue_functor {
   // callbacks.
   void Set(grpc_call* call, std::function<void(bool)> f,
            CompletionQueueTag* ops, bool can_inline) {
-    GPR_ASSERT(call_ == nullptr);
+    ABSL_CHECK_EQ(call_, nullptr);
     grpc_call_ref(call);
     call_ = call;
     func_ = std::move(f);
@@ -188,7 +201,7 @@ class CallbackWithSuccessTag : public grpc_completion_queue_functor {
   void force_run(bool ok) { Run(ok); }
 
   /// check if this tag is currently set
-  /* NOLINTNEXTLINE(google-explicit-constructor) */
+  // NOLINTNEXTLINE(google-explicit-constructor)
   operator bool() const { return call_ != nullptr; }
 
  private:
@@ -207,10 +220,22 @@ class CallbackWithSuccessTag : public grpc_completion_queue_functor {
     auto* ops = ops_;
 #endif
     bool do_callback = ops_->FinalizeResult(&ignored, &ok);
-    GPR_DEBUG_ASSERT(ignored == ops);
+#ifndef NDEBUG
+    ABSL_DCHECK(ignored == ops);
+#endif
 
     if (do_callback) {
-      CatchingCallback(func_, ok);
+      GetGlobalCallbackHook()->RunCallback(call_, [this, ok]() {
+#if GRPC_ALLOW_EXCEPTIONS
+        try {
+          func_(ok);
+        } catch (...) {
+          // nothing to return or change here, just don't crash the library
+        }
+#else   // GRPC_ALLOW_EXCEPTIONS
+  func_(ok);
+#endif  // GRPC_ALLOW_EXCEPTIONS
+      });
     }
   }
 };

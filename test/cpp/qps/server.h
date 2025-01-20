@@ -1,37 +1,38 @@
-/*
- *
- * Copyright 2015 gRPC authors.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- *
- */
+//
+//
+// Copyright 2015 gRPC authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+//
 
-#ifndef TEST_QPS_SERVER_H
-#define TEST_QPS_SERVER_H
-
-#include <vector>
+#ifndef GRPC_TEST_CPP_QPS_SERVER_H
+#define GRPC_TEST_CPP_QPS_SERVER_H
 
 #include <grpc/support/cpu.h>
-#include <grpc/support/log.h>
 #include <grpcpp/channel.h>
 #include <grpcpp/resource_quota.h>
 #include <grpcpp/security/server_credentials.h>
 #include <grpcpp/server_builder.h>
 
+#include <vector>
+
+#include "absl/log/log.h"
+#include "src/core/util/crash.h"
 #include "src/proto/grpc/testing/control.pb.h"
 #include "src/proto/grpc/testing/messages.pb.h"
 #include "test/core/end2end/data/ssl_test_data.h"
-#include "test/core/util/port.h"
+#include "test/core/test_util/port.h"
 #include "test/cpp/qps/usage_timer.h"
 #include "test/cpp/util/test_credentials_provider.h"
 
@@ -132,8 +133,8 @@ class Server {
                                       channel_arg.int_value());
           break;
         case ChannelArg::VALUE_NOT_SET:
-          gpr_log(GPR_ERROR, "Channel arg '%s' does not have a value",
-                  channel_arg.name().c_str());
+          LOG(ERROR) << "Channel arg '" << channel_arg.name()
+                     << "' does not have a value";
           break;
       }
     }
@@ -154,4 +155,4 @@ std::unique_ptr<Server> CreateCallbackServer(const ServerConfig& config);
 }  // namespace testing
 }  // namespace grpc
 
-#endif
+#endif  // GRPC_TEST_CPP_QPS_SERVER_H

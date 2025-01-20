@@ -1,36 +1,37 @@
-/*
- *
- * Copyright 2015 gRPC authors.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- *
- */
+//
+//
+// Copyright 2015 gRPC authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+//
 
-#include <stdio.h>
-#include <string.h>
-
+#include <grpc/credentials.h>
 #include <grpc/grpc.h>
 #include <grpc/grpc_security.h>
 #include <grpc/slice.h>
 #include <grpc/support/alloc.h>
-#include <grpc/support/log.h>
 #include <grpc/support/sync.h>
+#include <stdio.h>
+#include <string.h>
 
-#include "src/core/lib/gpr/string.h"
+#include "absl/log/check.h"
 #include "src/core/lib/security/credentials/composite/composite_credentials.h"
 #include "src/core/lib/security/credentials/credentials.h"
 #include "src/core/lib/slice/slice_string_helpers.h"
-#include "test/core/util/cmdline.h"
+#include "src/core/util/crash.h"
+#include "src/core/util/string.h"
+#include "test/core/test_util/cmdline.h"
 
 typedef struct {
   gpr_mu* mu;
@@ -49,7 +50,7 @@ static void on_metadata_response(void* arg, grpc_error_handle error) {
     fflush(stderr);
   } else {
     char* token;
-    GPR_ASSERT(sync->md_array.size == 1);
+    CHECK_EQ(sync->md_array.size, 1u);
     token = grpc_slice_to_c_string(GRPC_MDVALUE(sync->md_array.md[0]));
     printf("\nGot token: %s\n\n", token);
     gpr_free(token);

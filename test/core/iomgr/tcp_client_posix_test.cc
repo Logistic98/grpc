@@ -1,46 +1,45 @@
-/*
- *
- * Copyright 2015 gRPC authors.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- *
- */
+//
+//
+// Copyright 2015 gRPC authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+//
 
 #include <gtest/gtest.h>
 
 #include "src/core/lib/address_utils/parse_address.h"
 #include "src/core/lib/channel/channel_args.h"
-#include "src/core/lib/gprpp/time.h"
 #include "src/core/lib/iomgr/port.h"
-#include "test/core/util/port.h"
-#include "test/core/util/test_config.h"
+#include "src/core/util/time.h"
+#include "test/core/test_util/port.h"
+#include "test/core/test_util/test_config.h"
 
 // This test won't work except with posix sockets enabled
 #ifdef GRPC_POSIX_SOCKET_TCP_CLIENT
 
 #include <errno.h>
 #include <fcntl.h>
+#include <grpc/grpc.h>
+#include <grpc/support/alloc.h>
+#include <grpc/support/time.h>
 #include <netinet/in.h>
 #include <poll.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <unistd.h>
 
-#include <grpc/grpc.h>
-#include <grpc/support/alloc.h>
-#include <grpc/support/log.h>
-#include <grpc/support/time.h>
-
+#include "absl/log/log.h"
 #include "src/core/lib/event_engine/channel_args_endpoint_config.h"
 #include "src/core/lib/iomgr/iomgr.h"
 #include "src/core/lib/iomgr/pollset_set.h"
@@ -48,6 +47,7 @@
 #include "src/core/lib/iomgr/tcp_client.h"
 #include "src/core/lib/iomgr/timer.h"
 #include "src/core/lib/resource_quota/api.h"
+#include "src/core/util/crash.h"
 
 static grpc_pollset_set* g_pollset_set;
 static gpr_mu* g_mu;
@@ -73,8 +73,6 @@ static void finish_connection() {
 static void must_succeed(void* /*arg*/, grpc_error_handle error) {
   ASSERT_NE(g_connecting, nullptr);
   ASSERT_TRUE(error.ok());
-  grpc_endpoint_shutdown(g_connecting,
-                         GRPC_ERROR_CREATE("must_succeed called"));
   grpc_endpoint_destroy(g_connecting);
   g_connecting = nullptr;
   finish_connection();
@@ -87,7 +85,7 @@ static void must_fail(void* /*arg*/, grpc_error_handle error) {
 }
 
 void test_succeeds(void) {
-  gpr_log(GPR_ERROR, "---- starting test_succeeds() ----");
+  LOG(ERROR) << "---- starting test_succeeds() ----";
   grpc_resolved_address resolved_addr;
   struct sockaddr_in* addr =
       reinterpret_cast<struct sockaddr_in*>(resolved_addr.addr);
@@ -101,7 +99,7 @@ void test_succeeds(void) {
   resolved_addr.len = static_cast<socklen_t>(sizeof(struct sockaddr_in));
   addr->sin_family = AF_INET;
 
-  /* create a phony server */
+  // create a phony server
   svr_fd = socket(AF_INET, SOCK_STREAM, 0);
   ASSERT_GE(svr_fd, 0);
   ASSERT_EQ(bind(svr_fd, (struct sockaddr*)addr, (socklen_t)resolved_addr.len),
@@ -112,7 +110,7 @@ void test_succeeds(void) {
   connections_complete_before = g_connections_complete;
   gpr_mu_unlock(g_mu);
 
-  /* connect to it */
+  // connect to it
   ASSERT_EQ(getsockname(svr_fd, (struct sockaddr*)addr,
                         (socklen_t*)&resolved_addr.len),
             0);
@@ -124,7 +122,7 @@ void test_succeeds(void) {
       &done, &g_connecting, g_pollset_set,
       grpc_event_engine::experimental::ChannelArgsEndpointConfig(args),
       &resolved_addr, grpc_core::Timestamp::InfFuture());
-  /* await the connection */
+  // await the connection
   do {
     resolved_addr.len = static_cast<socklen_t>(sizeof(addr));
     r = accept(svr_fd, reinterpret_cast<struct sockaddr*>(addr),
@@ -152,11 +150,11 @@ void test_succeeds(void) {
   // A cancellation attempt should fail because connect already succeeded.
   ASSERT_EQ(grpc_tcp_client_cancel_connect(connection_handle), false);
 
-  gpr_log(GPR_ERROR, "---- finished test_succeeds() ----");
+  LOG(ERROR) << "---- finished test_succeeds() ----";
 }
 
 void test_fails(void) {
-  gpr_log(GPR_ERROR, "---- starting test_fails() ----");
+  LOG(ERROR) << "---- starting test_fails() ----";
   grpc_resolved_address resolved_addr;
   struct sockaddr_in* addr =
       reinterpret_cast<struct sockaddr_in*>(resolved_addr.addr);
@@ -172,7 +170,7 @@ void test_fails(void) {
   connections_complete_before = g_connections_complete;
   gpr_mu_unlock(g_mu);
 
-  /* connect to a broken address */
+  // connect to a broken address
   GRPC_CLOSURE_INIT(&done, must_fail, nullptr, grpc_schedule_on_exec_ctx);
   int64_t connection_handle = grpc_tcp_client_connect(
       &done, &g_connecting, g_pollset_set,
@@ -180,7 +178,7 @@ void test_fails(void) {
       &resolved_addr, grpc_core::Timestamp::InfFuture());
   gpr_mu_lock(g_mu);
 
-  /* wait for the connection callback to finish */
+  // wait for the connection callback to finish
   while (g_connections_complete == connections_complete_before) {
     grpc_pollset_worker* worker = nullptr;
     grpc_core::Timestamp polling_deadline = test_deadline();
@@ -189,7 +187,7 @@ void test_fails(void) {
         break;
       case GRPC_TIMERS_NOT_CHECKED:
         polling_deadline = grpc_core::Timestamp::ProcessEpoch();
-        ABSL_FALLTHROUGH_INTENDED;
+        [[fallthrough]];
       case GRPC_TIMERS_CHECKED_AND_EMPTY:
         ASSERT_TRUE(GRPC_LOG_IF_ERROR(
             "pollset_work",
@@ -206,11 +204,11 @@ void test_fails(void) {
   // A cancellation attempt should fail because connect already failed.
   ASSERT_EQ(grpc_tcp_client_cancel_connect(connection_handle), false);
 
-  gpr_log(GPR_ERROR, "---- finished test_fails() ----");
+  LOG(ERROR) << "---- finished test_fails() ----";
 }
 
 void test_connect_cancellation_succeeds(void) {
-  gpr_log(GPR_ERROR, "---- starting test_connect_cancellation_succeeds() ----");
+  LOG(ERROR) << "---- starting test_connect_cancellation_succeeds() ----";
   auto target_ipv6_addr_uri = *grpc_core::URI::Parse(absl::StrCat(
       "ipv6:[::1]:", std::to_string(grpc_pick_unused_port_or_die())));
   auto target_ipv4_addr_uri = *grpc_core::URI::Parse(absl::StrCat(
@@ -226,7 +224,7 @@ void test_connect_cancellation_succeeds(void) {
             bind(sock, reinterpret_cast<sockaddr*>(resolved_addr.addr),
                  resolved_addr.len) == 0);
   };
-  /* create a phony server */
+  // create a phony server
   svr_fd = socket(AF_INET6, SOCK_STREAM, 0);
   // Try ipv6
   if (!try_bind(svr_fd)) {
@@ -241,9 +239,8 @@ void test_connect_cancellation_succeeds(void) {
       if (svr_fd >= 0) {
         close(svr_fd);
       }
-      gpr_log(GPR_ERROR,
-              "Skipping test. Failed to create a phony server bound to ipv6 or "
-              "ipv4 address");
+      LOG(ERROR) << "Skipping test. Failed to create a phony server bound to "
+                    "ipv6 or ipv4 address";
       return;
     }
   }
@@ -309,11 +306,11 @@ void test_connect_cancellation_succeeds(void) {
     close(sock);
   }
   close(svr_fd);
-  gpr_log(GPR_ERROR, "---- finished test_connect_cancellation_succeeds() ----");
+  LOG(ERROR) << "---- finished test_connect_cancellation_succeeds() ----";
 }
 
 void test_fails_bad_addr_no_leak(void) {
-  gpr_log(GPR_ERROR, "---- starting test_fails_bad_addr_no_leak() ----");
+  LOG(ERROR) << "---- starting test_fails_bad_addr_no_leak() ----";
   grpc_resolved_address resolved_addr;
   struct sockaddr_in* addr =
       reinterpret_cast<struct sockaddr_in*>(resolved_addr.addr);
@@ -342,7 +339,7 @@ void test_fails_bad_addr_no_leak(void) {
         break;
       case GRPC_TIMERS_NOT_CHECKED:
         polling_deadline = grpc_core::Timestamp::ProcessEpoch();
-        ABSL_FALLTHROUGH_INTENDED;
+        [[fallthrough]];
       case GRPC_TIMERS_CHECKED_AND_EMPTY:
         ASSERT_TRUE(GRPC_LOG_IF_ERROR(
             "pollset_work",
@@ -354,7 +351,7 @@ void test_fails_bad_addr_no_leak(void) {
     gpr_mu_lock(g_mu);
   }
   gpr_mu_unlock(g_mu);
-  gpr_log(GPR_ERROR, "---- finished test_fails_bad_addr_no_leak() ----");
+  LOG(ERROR) << "---- finished test_fails_bad_addr_no_leak() ----";
 }
 
 static void destroy_pollset(void* p, grpc_error_handle /*error*/) {
@@ -386,7 +383,7 @@ TEST(TcpClientPosixTest, MainTest) {
   gpr_free(g_pollset);
 }
 
-#endif /* GRPC_POSIX_SOCKET_CLIENT */
+#endif  // GRPC_POSIX_SOCKET_CLIENT
 
 int main(int argc, char** argv) {
   grpc::testing::TestEnvironment env(&argc, argv);

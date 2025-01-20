@@ -1,34 +1,34 @@
-/*
- *
- * Copyright 2016 gRPC authors.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- *
- */
+//
+//
+// Copyright 2016 gRPC authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+//
 
-/* Benchmark gRPC end2end in various configurations */
+// Benchmark gRPC end2end in various configurations
 
-#include "test/core/util/build.h"
-#include "test/core/util/test_config.h"
+#include "test/core/test_util/build.h"
+#include "test/core/test_util/test_config.h"
 #include "test/cpp/microbenchmarks/fullstack_streaming_ping_pong.h"
 #include "test/cpp/util/test_config.h"
 
 namespace grpc {
 namespace testing {
 
-/*******************************************************************************
- * CONFIGURATIONS
- */
+//******************************************************************************
+// CONFIGURATIONS
+//
 
 static const int kMaxMessageSize = [] {
   if (BuiltUnderMsan() || BuiltUnderTsan() || BuiltUnderUbsan()) {
@@ -52,34 +52,22 @@ static void StreamingPingPongArgs(benchmark::internal::Benchmark* b) {
   }
 }
 
-BENCHMARK_TEMPLATE(BM_StreamingPingPong, InProcessCHTTP2, NoOpMutator,
-                   NoOpMutator)
-    ->Apply(StreamingPingPongArgs);
 BENCHMARK_TEMPLATE(BM_StreamingPingPong, TCP, NoOpMutator, NoOpMutator)
     ->Apply(StreamingPingPongArgs);
 BENCHMARK_TEMPLATE(BM_StreamingPingPong, InProcess, NoOpMutator, NoOpMutator)
     ->Apply(StreamingPingPongArgs);
 
-BENCHMARK_TEMPLATE(BM_StreamingPingPongMsgs, InProcessCHTTP2, NoOpMutator,
-                   NoOpMutator)
-    ->Range(0, kMaxMessageSize);
 BENCHMARK_TEMPLATE(BM_StreamingPingPongMsgs, TCP, NoOpMutator, NoOpMutator)
     ->Range(0, kMaxMessageSize);
 BENCHMARK_TEMPLATE(BM_StreamingPingPongMsgs, InProcess, NoOpMutator,
                    NoOpMutator)
     ->Range(0, kMaxMessageSize);
 
-BENCHMARK_TEMPLATE(BM_StreamingPingPong, MinInProcessCHTTP2, NoOpMutator,
-                   NoOpMutator)
-    ->Apply(StreamingPingPongArgs);
 BENCHMARK_TEMPLATE(BM_StreamingPingPong, MinTCP, NoOpMutator, NoOpMutator)
     ->Apply(StreamingPingPongArgs);
 BENCHMARK_TEMPLATE(BM_StreamingPingPong, MinInProcess, NoOpMutator, NoOpMutator)
     ->Apply(StreamingPingPongArgs);
 
-BENCHMARK_TEMPLATE(BM_StreamingPingPongMsgs, MinInProcessCHTTP2, NoOpMutator,
-                   NoOpMutator)
-    ->Range(0, kMaxMessageSize);
 BENCHMARK_TEMPLATE(BM_StreamingPingPongMsgs, MinTCP, NoOpMutator, NoOpMutator)
     ->Range(0, kMaxMessageSize);
 BENCHMARK_TEMPLATE(BM_StreamingPingPongMsgs, MinInProcess, NoOpMutator,
@@ -106,12 +94,6 @@ static void StreamingPingPongWithCoalescingApiArgs(
   }
 }
 
-BENCHMARK_TEMPLATE(BM_StreamingPingPongWithCoalescingApi, InProcessCHTTP2,
-                   NoOpMutator, NoOpMutator)
-    ->Apply(StreamingPingPongWithCoalescingApiArgs);
-BENCHMARK_TEMPLATE(BM_StreamingPingPongWithCoalescingApi, MinInProcessCHTTP2,
-                   NoOpMutator, NoOpMutator)
-    ->Apply(StreamingPingPongWithCoalescingApiArgs);
 BENCHMARK_TEMPLATE(BM_StreamingPingPongWithCoalescingApi, InProcess,
                    NoOpMutator, NoOpMutator)
     ->Apply(StreamingPingPongWithCoalescingApiArgs);

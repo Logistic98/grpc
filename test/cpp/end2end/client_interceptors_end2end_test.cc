@@ -1,27 +1,20 @@
-/*
- *
- * Copyright 2018 gRPC authors.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- *
- */
-
-#include <memory>
-#include <vector>
-
-#include <gtest/gtest.h>
-
-#include "absl/memory/memory.h"
+//
+//
+// Copyright 2018 gRPC authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+//
 
 #include <grpcpp/channel.h>
 #include <grpcpp/client_context.h>
@@ -34,11 +27,17 @@
 #include <grpcpp/server_context.h>
 #include <grpcpp/server_posix.h>
 #include <grpcpp/support/client_interceptor.h>
+#include <gtest/gtest.h>
 
+#include <memory>
+#include <vector>
+
+#include "absl/log/check.h"
+#include "absl/memory/memory.h"
 #include "src/core/lib/iomgr/port.h"
 #include "src/proto/grpc/testing/echo.grpc.pb.h"
-#include "test/core/util/port.h"
-#include "test/core/util/test_config.h"
+#include "test/core/test_util/port.h"
+#include "test/core/test_util/test_config.h"
 #include "test/cpp/end2end/interceptors_util.h"
 #include "test/cpp/end2end/test_service_impl.h"
 #include "test/cpp/util/byte_buffer_proto_helper.h"
@@ -48,7 +47,7 @@
 #include <fcntl.h>
 
 #include "src/core/lib/iomgr/socket_utils_posix.h"
-#endif /* GRPC_POSIX_SOCKET */
+#endif  // GRPC_POSIX_SOCKET
 
 namespace grpc {
 namespace testing {
@@ -70,7 +69,7 @@ enum class ChannelType {
   kFdChannel,
 };
 
-/* Hijacks Echo RPC and fills in the expected values */
+// Hijacks Echo RPC and fills in the expected values
 class HijackingInterceptor : public experimental::Interceptor {
  public:
   explicit HijackingInterceptor(experimental::ClientRpcInfo* info) {
@@ -127,9 +126,8 @@ class HijackingInterceptor : public experimental::Interceptor {
       auto* map = methods->GetRecvTrailingMetadata();
       bool found = false;
       // Check that we received the metadata as an echo
-      for (const auto& pair : *map) {
-        found = pair.first.starts_with("testkey") &&
-                pair.second.starts_with("testvalue");
+      for (const auto& [key, value] : *map) {
+        found = key.starts_with("testkey") && value.starts_with("testvalue");
         if (found) break;
       }
       EXPECT_EQ(found, true);
@@ -248,9 +246,8 @@ class HijackingInterceptorMakesAnotherCall : public experimental::Interceptor {
       auto* map = methods->GetRecvTrailingMetadata();
       bool found = false;
       // Check that we received the metadata as an echo
-      for (const auto& pair : *map) {
-        found = pair.first.starts_with("testkey") &&
-                pair.second.starts_with("testvalue");
+      for (const auto& [key, value] : *map) {
+        found = key.starts_with("testkey") && value.starts_with("testvalue");
         if (found) break;
       }
       EXPECT_EQ(found, true);
@@ -472,9 +469,8 @@ class ServerStreamingRpcHijackingInterceptor
       auto* map = methods->GetRecvTrailingMetadata();
       bool found = false;
       // Check that we received the metadata as an echo
-      for (const auto& pair : *map) {
-        found = pair.first.starts_with("testkey") &&
-                pair.second.starts_with("testvalue");
+      for (const auto& [key, value] : *map) {
+        found = key.starts_with("testkey") && value.starts_with("testvalue");
         if (found) break;
       }
       EXPECT_EQ(found, true);
@@ -620,9 +616,8 @@ class LoggingInterceptor : public experimental::Interceptor {
       auto* map = methods->GetRecvTrailingMetadata();
       bool found = false;
       // Check that we received the metadata as an echo
-      for (const auto& pair : *map) {
-        found = pair.first.starts_with("testkey") &&
-                pair.second.starts_with("testvalue");
+      for (const auto& [key, value] : *map) {
+        found = key.starts_with("testkey") && value.starts_with("testvalue");
         if (found) break;
       }
       EXPECT_EQ(found, true);
@@ -739,7 +734,7 @@ std::vector<TestScenario> CreateTestScenarios() {
 // TODO(yashykt): Maybe add support for non-posix sockets too
 #ifdef GRPC_POSIX_SOCKET
     scenarios.emplace_back(ChannelType::kFdChannel, rpc_type);
-#endif /* GRPC_POSIX_SOCKET */
+#endif  // GRPC_POSIX_SOCKET
   }
   return scenarios;
 }
@@ -759,19 +754,17 @@ class ParameterizedClientInterceptorsEnd2endTest
 #ifdef GRPC_POSIX_SOCKET
     else if (GetParam().channel_type() == ChannelType::kFdChannel) {
       int flags;
-      GPR_ASSERT(socketpair(AF_UNIX, SOCK_STREAM, 0, sv_) == 0);
+      CHECK_EQ(socketpair(AF_UNIX, SOCK_STREAM, 0, sv_), 0);
       flags = fcntl(sv_[0], F_GETFL, 0);
-      GPR_ASSERT(fcntl(sv_[0], F_SETFL, flags | O_NONBLOCK) == 0);
+      CHECK_EQ(fcntl(sv_[0], F_SETFL, flags | O_NONBLOCK), 0);
       flags = fcntl(sv_[1], F_GETFL, 0);
-      GPR_ASSERT(fcntl(sv_[1], F_SETFL, flags | O_NONBLOCK) == 0);
-      GPR_ASSERT(grpc_set_socket_no_sigpipe_if_possible(sv_[0]) ==
-                 absl::OkStatus());
-      GPR_ASSERT(grpc_set_socket_no_sigpipe_if_possible(sv_[1]) ==
-                 absl::OkStatus());
+      CHECK_EQ(fcntl(sv_[1], F_SETFL, flags | O_NONBLOCK), 0);
+      CHECK(grpc_set_socket_no_sigpipe_if_possible(sv_[0]) == absl::OkStatus());
+      CHECK(grpc_set_socket_no_sigpipe_if_possible(sv_[1]) == absl::OkStatus());
       server_ = builder.BuildAndStart();
       AddInsecureChannelFromFd(server_.get(), sv_[1]);
     }
-#endif /* GRPC_POSIX_SOCKET */
+#endif  // GRPC_POSIX_SOCKET
   }
 
   ~ParameterizedClientInterceptorsEnd2endTest() override {
@@ -792,7 +785,7 @@ class ParameterizedClientInterceptorsEnd2endTest
       return experimental::CreateCustomInsecureChannelWithInterceptorsFromFd(
           "", sv_[0], ChannelArguments(), std::move(creators));
     }
-#endif /* GRPC_POSIX_SOCKET */
+#endif  // GRPC_POSIX_SOCKET
     return nullptr;
   }
 
@@ -1262,6 +1255,6 @@ int main(int argc, char** argv) {
   ::testing::InitGoogleTest(&argc, argv);
   int ret = RUN_ALL_TESTS();
   // Make sure that gRPC shuts down cleanly
-  GPR_ASSERT(grpc_wait_until_shutdown(10));
+  CHECK(grpc_wait_until_shutdown(10));
   return ret;
 }

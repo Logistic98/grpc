@@ -11,28 +11,26 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-#ifndef GRPC_CORE_LIB_EVENT_ENGINE_WINDOWS_IOCP_H
-#define GRPC_CORE_LIB_EVENT_ENGINE_WINDOWS_IOCP_H
+#ifndef GRPC_SRC_CORE_LIB_EVENT_ENGINE_WINDOWS_IOCP_H
+#define GRPC_SRC_CORE_LIB_EVENT_ENGINE_WINDOWS_IOCP_H
 
 #include <grpc/support/port_platform.h>
 
 #ifdef GPR_WINDOWS
 
-#include "absl/status/status.h"
-
 #include <grpc/event_engine/event_engine.h>
 
-#include "src/core/lib/event_engine/executor/executor.h"
+#include "absl/status/status.h"
 #include "src/core/lib/event_engine/poller.h"
+#include "src/core/lib/event_engine/thread_pool/thread_pool.h"
 #include "src/core/lib/event_engine/windows/win_socket.h"
 
-namespace grpc_event_engine {
-namespace experimental {
+namespace grpc_event_engine::experimental {
 
 class IOCP final : public Poller {
  public:
-  explicit IOCP(Executor* executor) noexcept;
-  ~IOCP();
+  explicit IOCP(ThreadPool* thread_pool) noexcept;
+  ~IOCP() override;
   // Not copyable
   IOCP(const IOCP&) = delete;
   IOCP& operator=(const IOCP&) = delete;
@@ -54,16 +52,15 @@ class IOCP final : public Poller {
   // Initialize default flags via checking platform support
   static DWORD WSASocketFlagsInit();
 
-  Executor* executor_;
+  ThreadPool* thread_pool_;
   HANDLE iocp_handle_;
   OVERLAPPED kick_overlap_;
   ULONG kick_token_;
   std::atomic<int> outstanding_kicks_{0};
 };
 
-}  // namespace experimental
-}  // namespace grpc_event_engine
+}  // namespace grpc_event_engine::experimental
 
 #endif
 
-#endif  // GRPC_CORE_LIB_EVENT_ENGINE_WINDOWS_IOCP_H
+#endif  // GRPC_SRC_CORE_LIB_EVENT_ENGINE_WINDOWS_IOCP_H

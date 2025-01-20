@@ -1,26 +1,26 @@
-/*
- *
- * Copyright 2018 gRPC authors.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- *
- */
+//
+//
+// Copyright 2018 gRPC authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+//
 
 #include "test/cpp/end2end/interceptors_util.h"
 
+#include "absl/log/check.h"
 #include "absl/memory/memory.h"
-
-#include "test/core/util/test_config.h"
+#include "test/core/test_util/test_config.h"
 
 namespace grpc {
 namespace testing {
@@ -183,8 +183,8 @@ void MakeCallbackCall(const std::shared_ptr<Channel>& channel) {
 
 bool CheckMetadata(const std::multimap<grpc::string_ref, grpc::string_ref>& map,
                    const string& key, const string& value) {
-  for (const auto& pair : map) {
-    if (pair.first.starts_with(key) && pair.second.starts_with(value)) {
+  for (const auto& [k, v] : map) {
+    if (k.starts_with(key) && v.starts_with(value)) {
       return true;
     }
   }
@@ -193,8 +193,8 @@ bool CheckMetadata(const std::multimap<grpc::string_ref, grpc::string_ref>& map,
 
 bool CheckMetadata(const std::multimap<std::string, std::string>& map,
                    const string& key, const string& value) {
-  for (const auto& pair : map) {
-    if (pair.first == key && pair.second == value) {
+  for (const auto& [k, v] : map) {
+    if (k == key && v == value) {
       return true;
     }
   }

@@ -17,14 +17,12 @@
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
-
 #include "src/core/lib/event_engine/posix_engine/wakeup_fd_eventfd.h"
 #include "src/core/lib/event_engine/posix_engine/wakeup_fd_pipe.h"
 #include "src/core/lib/event_engine/posix_engine/wakeup_fd_posix.h"
 #include "src/core/lib/iomgr/port.h"
 
-namespace grpc_event_engine {
-namespace experimental {
+namespace grpc_event_engine::experimental {
 
 #ifdef GRPC_POSIX_WAKEUP_FD
 
@@ -53,7 +51,7 @@ absl::StatusOr<std::unique_ptr<WakeupFd>> CreateWakeupFd() {
   return g_wakeup_fd_fn();
 }
 
-#else /* GRPC_POSIX_WAKEUP_FD */
+#else  // GRPC_POSIX_WAKEUP_FD
 
 bool SupportsWakeupFd() { return false; }
 
@@ -61,7 +59,6 @@ absl::StatusOr<std::unique_ptr<WakeupFd>> CreateWakeupFd() {
   return absl::NotFoundError("Wakeup-fd is not supported on this system");
 }
 
-#endif /* GRPC_POSIX_WAKEUP_FD */
+#endif  // GRPC_POSIX_WAKEUP_FD
 
-}  // namespace experimental
-}  // namespace grpc_event_engine
+}  // namespace grpc_event_engine::experimental
